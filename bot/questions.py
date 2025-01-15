@@ -25,45 +25,79 @@ async def extract_group(
     message: Message, context: CallbackContext
 ) -> tuple[str, Message]:
     """Extracts a question from a message in a group chat."""
-    text = await _extract_text(message, context)
-
-    # Проверяем, является ли сообщение ответом боту
+    # Check if the message is a reply to the bot
     is_reply_to_bot = (
         message.reply_to_message
         and message.reply_to_message.from_user.username == context.bot.username
     )
 
-    # Проверяем упоминание бота
+    # Check for bot mention
     entities = message.entities or message.caption_entities
     mention = (
         entities[0] if entities and entities[0].type == MessageEntity.MENTION else None
     )
+    has_bot_mention = False
+    if mention:
+        mention_text = message.text[mention.offset : mention.offset + mention.length]
+        has_bot_mention = mention_text.lower() == context.bot.name.lower()
 
-    # Если это не ответ боту и нет упоминания - игнорируем
-    if not is_reply_to_bot and not mention:
+    # Check message type
+    has_voice = bool(message.voice)
+    has_file = bool(message.document)
+    has_text = bool(message.text or message.caption)
+
+    # Ignore if there's no reply to bot and no bot mention
+    if not is_reply_to_bot and not has_bot_mention:
         return "", message
 
-    # Если это ответ боту
+    # Get text from current message
+    current_text = await _extract_text(message, context)
+
+    # If this is a reply to the bot
     if is_reply_to_bot:
-        question = f"+ {text}" if text else ""
+        # Process voice messages and files even without text
+        if has_voice or has_file:
+            return f"+ {current_text}" if current_text else "+", message
+        # Text messages require text content
+        if has_text:
+            return f"+ {current_text}" if current_text else "", message
+        return "", message
+
+    # If the bot is mentioned
+    if has_bot_mention:
+        # Remove the mention from text
+        question = (
+            current_text[: mention.offset]
+            + current_text[mention.offset + mention.length :]
+        )
+        question = question.strip()
+
+        # If this is a reply to another message
+        if (
+            message.reply_to_message
+            and not message.reply_to_message.forum_topic_created
+        ):
+            reply_msg = message.reply_to_message
+
+            # Check the type of message being replied to
+            reply_has_voice = bool(reply_msg.voice)
+            reply_has_file = bool(reply_msg.document)
+
+            if reply_has_voice or reply_has_file:
+                # Special handling for voice messages and files
+                reply_text = await _extract_text(reply_msg, context)
+                return (
+                    f"{question}: {reply_text}" if question else reply_text,
+                    reply_msg,
+                )
+
+            # Same logic as before for text messages
+            reply_text = await _extract_text(reply_msg, context)
+            return (f"{question}: {reply_text}" if question else reply_text, reply_msg)
+
         return question, message
 
-    # Если есть упоминание, проверяем что оно относится к боту
-    mention_text = text[mention.offset : mention.offset + mention.length]
-    if mention_text.lower() != context.bot.name.lower():
-        return "", message
-
-    # Убираем упоминание из текста
-    question = text[: mention.offset] + text[mention.offset + mention.length :]
-    question = question.strip()
-
-    # Если это ответ на сообщение (но не на создание топика)
-    if message.reply_to_message and not message.reply_to_message.forum_topic_created:
-        reply_text = await _extract_text(message.reply_to_message, context)
-        question = f"{question}: {reply_text}" if question else reply_text
-        return question, message.reply_to_message
-
-    return question, message
+    return "", message
 
 
 def extract_prev(message: Message, context: CallbackContext) -> str:
