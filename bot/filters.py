@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Union
 
 from telegram.ext import filters
+from telegram import Message, MessageEntity
 
 from bot.config import config
 
@@ -27,7 +28,9 @@ class Filters:
         """Defines users and chats that are allowed to use the bot."""
         if config.telegram.usernames:
             self.users = filters.User(username=config.telegram.usernames)
-            self.chats = filters.Chat(chat_id=config.telegram.chat_ids)
+            # Преобразуем все ID чатов в отрицательные для групп
+            chat_ids = [-abs(chat_id) for chat_id in config.telegram.chat_ids]
+            self.chats = filters.Chat(chat_id=chat_ids)
         else:
             self.users = filters.ALL
             self.chats = filters.ALL
@@ -59,3 +62,26 @@ class Filters:
         if self.users == filters.ALL:
             return False
         return username in self.users.usernames
+
+    def is_bot_mentioned(self, message: Message, bot_username: str) -> bool:
+        """Проверяет, упомянут ли бот в сообщении."""
+        entities = message.entities or message.caption_entities
+        if not entities:
+            return False
+
+        for entity in entities:
+            if entity.type == MessageEntity.MENTION:
+                mention_text = message.text[
+                    entity.offset : entity.offset + entity.length
+                ]
+                if mention_text.lower() == f"@{bot_username.lower()}":
+                    return True
+        return False
+
+    def is_reply_to_bot(self, message: Message, bot_username: str) -> bool:
+        """Проверяет, является ли сообщение ответом боту."""
+        return (
+            message.reply_to_message
+            and message.reply_to_message.from_user
+            and message.reply_to_message.from_user.username == bot_username
+        )
