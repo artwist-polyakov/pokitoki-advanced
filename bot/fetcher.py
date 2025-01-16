@@ -5,7 +5,7 @@ import urllib.parse
 import aiohttp
 import httpx
 from bs4 import BeautifulSoup
-from httpx import HTTPStatusError, RequestError
+from httpx import HTTPStatusError, RequestError, TimeoutException
 
 from bot.config import config
 
@@ -71,12 +71,20 @@ class Fetcher:
 
         except HTTPStatusError as exc:
             # If it's a 403, let's try fallback
-            if exc.response.status_code == 403:
+            if exc.response.status_code == 403 or exc.response.status_code == 401:
                 token = config.scrapdo.token
                 if token and token.strip():
                     return await self._fetch_via_scrapdo(url, token)
             # Not a 403 or no token -> re-raise
             raise
+
+        except TimeoutException as exc:
+            # If we face typical network issues, fallback to Scrap.do if token is set
+            token = config.scrapdo.token
+            if token and token.strip():
+                return await self._fetch_via_scrapdo(url, token)
+            else:
+                raise
 
         except (
             httpx.ReadTimeout,
@@ -121,7 +129,7 @@ class Fetcher:
                 },
             ) as resp:
                 if resp.status == 401:
-                    raise ValueError("Invalid Scrap.do token")
+                    raise ValueError("Invalid Scrap.do token OR Scrape.do is banned")
                 if resp.status == 429:
                     raise ValueError("Scrap.do rate limit exceeded")
 
