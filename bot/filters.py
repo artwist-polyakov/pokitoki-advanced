@@ -28,7 +28,7 @@ class Filters:
         """Defines users and chats that are allowed to use the bot."""
         if config.telegram.usernames:
             self.users = filters.User(username=config.telegram.usernames)
-            # Преобразуем все ID чатов в отрицательные для групп
+            # Convert all chat IDs to negative for groups
             chat_ids = [-abs(chat_id) for chat_id in config.telegram.chat_ids]
             self.chats = filters.Chat(chat_id=chat_ids)
         else:
@@ -64,7 +64,7 @@ class Filters:
         return username in self.users.usernames
 
     def is_bot_mentioned(self, message: Message, bot_username: str) -> bool:
-        """Проверяет, упомянут ли бот в сообщении."""
+        """Checks if the bot is mentioned in the message."""
         entities = message.entities or message.caption_entities
         if not entities:
             return False
@@ -79,7 +79,7 @@ class Filters:
         return False
 
     def is_reply_to_bot(self, message: Message, bot_username: str) -> bool:
-        """Проверяет, является ли сообщение ответом боту."""
+        """Checks if the message is a reply to the bot."""
         return (
             message.reply_to_message
             and message.reply_to_message.from_user
