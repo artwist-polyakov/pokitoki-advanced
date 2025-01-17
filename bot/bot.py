@@ -252,8 +252,11 @@ async def reply_to(
         if message.voice and config.voice.tts_enabled:
             speech_file = await voice_processor.text_to_speech(answer)
             if speech_file:
-                await message.reply_voice(speech_file)
-                speech_file.unlink()  # Clean up
+                try:
+                    with open(speech_file, "rb") as audio:
+                        await message.reply_voice(audio)
+                finally:
+                    speech_file.unlink()  # Clean up
 
     except Exception as exc:
         class_name = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
