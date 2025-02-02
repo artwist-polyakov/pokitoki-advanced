@@ -4,7 +4,7 @@ import logging
 from typing import Awaitable
 from pathlib import Path
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from telegram import Chat, Update
 from telegram.ext import CallbackContext
@@ -28,14 +28,100 @@ class MessageCommand:
         self.reply_func = reply_func
         self.voice_processor = VoiceProcessor()
         self.filters = Filters()
+        self.last_message_time = {}  # Для хранения времени последнего сообщения
+        self.grouped_messages = {}  # Для хранения сгруппированных сообщений
+        self.GROUP_WINDOW = timedelta(seconds=3)  # Окно группировки - 3 секунды
 
     async def __call__(self, update: Update, context: CallbackContext) -> None:
         message = update.message
         chat_id = message.chat.id
+        current_time = datetime.now()
 
         # Проверяем, есть ли активная сессия парсинга
         parsing_session = active_sessions.get(chat_id)
         is_parsing_mode = parsing_session is not None
+
+        # Обработка пересланных сообщений
+        if message.forward_date:
+            # Проверяем, было ли предыдущее сообщение недавно
+            last_time = self.last_message_time.get(chat_id)
+
+            # Всегда добавляем сообщение в группу
+            if chat_id not in self.grouped_messages:
+                self.grouped_messages[chat_id] = []
+                self.last_message_time[chat_id] = current_time
+
+            # Формируем контекст сообщения
+            forwarded_from = (
+                message.forward_from.username
+                if message.forward_from
+                else message.forward_sender_name or "Unknown"
+            )
+            forward_date = message.forward_date.strftime("%Y-%m-%d %H:%M:%S")
+            content = message.text or message.caption or ""
+
+            # Добавляем информацию об отправителе в начало контента
+            msg_text = (
+                f"Forwarded from {forwarded_from} at {forward_date}:\n{content}\n"
+            )
+
+            # Обрабатываем файлы, если есть
+            if message.document or message.photo:
+                file_processor = FileProcessor()
+                file_content = await file_processor.process_files(
+                    documents=[message.document] if message.document else [],
+                    photos=message.photo if message.photo else [],
+                )
+                if file_content:
+                    if is_parsing_mode:
+                        if message.document:
+                            filename = message.document.file_name
+                            attached_files = [filename]
+                        else:
+                            # Обрабатываем все фото в сообщении
+                            attached_files = []
+                            for photo in message.photo[
+                                -1:
+                            ]:  # Берем только самое большое фото
+                                filename = f"image_{photo.file_unique_id}"
+                                parsing_session.state.file_contents[filename] = (
+                                    file_content
+                                )
+                                attached_files.append(filename)
+                        msg_text += f"\nAttached files: {', '.join(attached_files)}"
+                    else:
+                        msg_text += f"\n\n{file_content}"
+
+            self.grouped_messages[chat_id].append(msg_text)
+
+            # Если прошло больше времени окна, обрабатываем группу
+            if not last_time or (current_time - last_time) > self.GROUP_WINDOW:
+                grouped_text = "\n".join(self.grouped_messages[chat_id])
+                del self.grouped_messages[chat_id]
+                del self.last_message_time[chat_id]  # Очищаем таймер
+
+                if is_parsing_mode:
+                    # Добавляем группу в парсинг сессию
+                    timestamp = datetime.fromtimestamp(message.forward_date.timestamp())
+                    parsed_message = ParsedMessage(
+                        sender_id=update.effective_user.username
+                        or "Anonymous",  # Безопасное значение
+                        timestamp=timestamp,
+                        content=grouped_text,
+                        attached_files=[],
+                    )
+                    parsing_session.state.messages.append(parsed_message)
+                else:
+                    # Обрабатываем группу как одно сообщение с контекстом
+                    await self.reply_func(
+                        update=update,
+                        message=message,
+                        context=context,
+                        question=grouped_text,  # Передаем полный контекст
+                    )
+            return
+
+        # Остальной код обработки обычных сообщений остается без изменений...
 
         # Извлекаем текст и файлы
         question = ""
@@ -60,7 +146,7 @@ class MessageCommand:
                     if message.document:
                         filename = message.document.file_name
                     else:
-                        filename = f"image_{message.photo[-1].file_unique_id}.txt"
+                        filename = f"image_{message.photo[-1].file_unique_id}"
                     parsing_session.state.file_contents[filename] = file_content
                     await message.reply_text(f"Added file: {filename}")
                 return

@@ -136,6 +136,16 @@ class ParseManyCommand:
                 )
                 return
 
+            # Проверяем, все ли файлы обработаны
+            for msg in session.state.messages:
+                if msg.attached_files:
+                    for filename in msg.attached_files:
+                        if filename not in session.state.file_contents:
+                            await update.message.reply_text(
+                                f"Still processing file: {filename}. Please wait and try again."
+                            )
+                            return
+
             # Генерируем документ
             document_content = self._generate_document(session.state)
             if not document_content:
@@ -152,12 +162,17 @@ class ParseManyCommand:
                 caption=f"Parsed content from session {session_id}",
             )
 
-            # Очищаем сессию
+            # Очищаем сессию и все связанные данные
             await session.cleanup_callback()
-            del active_sessions[chat_id]
+            if chat_id in active_sessions:
+                del active_sessions[chat_id]
 
         except Exception as e:
             logger.error(f"Parse error: {str(e)}", exc_info=True)
+            # В случае ошибки тоже очищаем
+            if chat_id in active_sessions:
+                await active_sessions[chat_id].cleanup_callback()
+                del active_sessions[chat_id]
             await update.message.reply_text(f"Error generating document: {str(e)}")
 
     def _generate_document(self, state: ParsingState) -> str:
@@ -224,6 +239,7 @@ class ParseManyCommand:
                 cleaned_content = file_content.replace(f"<file_{filename}>", "")
                 cleaned_content = cleaned_content.replace(f"</file_{filename}>", "")
 
+                # Не добавляем .txt к именам файлов
                 content.append(f"[[[{filename}--BEGIN]]]")
                 content.append(cleaned_content)
                 content.append(f"[[[{filename}--END]]]\n")
