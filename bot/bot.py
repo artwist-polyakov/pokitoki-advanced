@@ -33,11 +33,11 @@ logging.basicConfig(
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
-logging.getLogger("bot").setLevel(logging.INFO)
-logging.getLogger("bot.ai.chatgpt").setLevel(logging.INFO)
-logging.getLogger("bot.commands").setLevel(logging.INFO)
-logging.getLogger("bot.questions").setLevel(logging.INFO)
-logging.getLogger("__main__").setLevel(logging.INFO)
+logging.getLogger("bot").setLevel(logging.WARNING)
+logging.getLogger("bot.ai.chatgpt").setLevel(logging.WARNING)
+logging.getLogger("bot.commands").setLevel(logging.WARNING)
+logging.getLogger("bot.questions").setLevel(logging.WARNING)
+logging.getLogger("__main__").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,30 @@ def main():
 def add_handlers(application: Application):
     """Adds command handlers."""
 
+    # Define filter conditions for private chats
+    private_chat = tg_filters.ChatType.PRIVATE
+
+    # Define filter conditions for messages
+    text_messages = (
+        filters.text_filter & filters.users_or_chats
+    ) | (  # упоминание бота или личка
+        private_chat & filters.users
+    )  # любой текст в личке от разрешенных пользователей
+
+    media_messages = (
+        (tg_filters.PHOTO | tg_filters.Document.ALL)
+        & filters.text_filter
+        & filters.users_or_chats
+    ) | (  # медиа с упоминанием
+        (tg_filters.PHOTO | tg_filters.Document.ALL) & private_chat & filters.users
+    )  # любые медиа в личке
+
+    voice_messages = (
+        tg_filters.VOICE & filters.users_or_chats
+    ) | (  # голосовые с упоминанием
+        tg_filters.VOICE & private_chat & filters.users
+    )  # любые голосовые в личке
+
     # info commands
     application.add_handler(CommandHandler("start", commands.Start()))
     application.add_handler(
@@ -101,12 +125,10 @@ def add_handlers(application: Application):
         )
     )
 
-    # text message handler
+    # text and media message handler
     application.add_handler(
         MessageHandler(
-            (filters.text_filter | tg_filters.PHOTO | tg_filters.Document.ALL)
-            & ~tg_filters.COMMAND
-            & filters.users_or_chats,
+            text_messages | media_messages,
             commands.Message(reply_to),
         )
     )
@@ -114,7 +136,7 @@ def add_handlers(application: Application):
     # voice message handler
     application.add_handler(
         MessageHandler(
-            tg_filters.VOICE & filters.users_or_chats,
+            voice_messages,
             commands.VoiceMessage(reply_to),
         )
     )

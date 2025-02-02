@@ -16,7 +16,8 @@ class StartCommand:
         if update.effective_user.username not in config.telegram.usernames:
             text = (
                 "Sorry, I don't know you. To setup your own bot, "
-                "visit https://github.com/artwist-polyakov/pokitoki-advanced"
+                "visit https://github.com/artwist-polyakov/pokitoki-advanced."
+                "\n\nOr you can contact @polyakovbest to ask for access to this bot"
             )
             await update.message.reply_text(text)
             return
