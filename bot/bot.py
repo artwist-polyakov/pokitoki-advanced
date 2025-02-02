@@ -6,6 +6,7 @@ import tempfile
 import textwrap
 import time
 from pathlib import Path
+from datetime import datetime
 
 from telegram import Chat, Message, Update
 from telegram.ext import (
@@ -15,6 +16,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     PicklePersistence,
+    CallbackQueryHandler,
 )
 from telegram.ext import filters as tg_filters
 
@@ -22,15 +24,19 @@ from bot import askers, commands, models, questions
 from bot.config import config
 from bot.fetcher import Fetcher
 from bot.filters import Filters
-from bot.models import ChatData, UserData
+from bot.models import ChatData, UserData, ParsedMessage
 from bot.voice import VoiceProcessor
 from bot.file_processor import FileProcessor
+from bot.commands.parsemany import ParseManyCommand, active_sessions, get_content_hash
 
 logging.basicConfig(
     stream=sys.stdout,
-    level=logging.WARNING,
+    level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
+# Добавим логирование для telegram.ext
+logging.getLogger("telegram").setLevel(logging.DEBUG)
+logging.getLogger("telegram.ext").setLevel(logging.DEBUG)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("bot").setLevel(logging.INFO)
@@ -69,6 +75,21 @@ def main():
 
 def add_handlers(application: Application):
     """Adds command handlers."""
+
+    # Простой callback handler для тестирования
+    async def test_callback(update: Update, context: CallbackContext):
+        logger.debug("=" * 50)
+        logger.debug("Test callback received!")
+        if update.callback_query:
+            logger.debug(f"Callback data: {update.callback_query.data}")
+            await update.callback_query.answer("Test callback works!")
+            await update.callback_query.message.reply_text("Button clicked!")
+        logger.debug("=" * 50)
+
+    # Регистрируем handlers
+    application.add_handler(CallbackQueryHandler(test_callback))
+    application.add_handler(CommandHandler("parsemany", ParseManyCommand()))
+    application.add_handler(CommandHandler("parseit", ParseManyCommand().parse_session))
 
     # info commands
     application.add_handler(CommandHandler("start", commands.Start()))
@@ -143,6 +164,12 @@ async def post_init(application: Application) -> None:
 async def post_shutdown(application: Application) -> None:
     """Frees acquired resources."""
     await fetcher.close()
+    # Очищаем все активные сессии парсинга
+    parsemany_command = application.handlers[0].get(
+        lambda h: isinstance(h, ParseManyCommand), None
+    )
+    if parsemany_command:
+        await parsemany_command.cleanup_all_sessions()
 
 
 def with_message_limit(func):
@@ -185,6 +212,96 @@ async def reply_to(
     update: Update, message: Message, context: CallbackContext, question: str
 ) -> None:
     """Replies to a specific question."""
+    chat_id = update.effective_chat.id
+
+    # Если активен режим парсинга для этого чата
+    if chat_id in active_sessions:
+        session = active_sessions[chat_id]
+        state = session.state
+
+        # Создаем запись о сообщении
+        entry = ParsedMessage(
+            sender_id=update.effective_user.username or str(update.effective_user.id),
+            timestamp=datetime.now(),
+            content=question,
+            attached_files=[],
+        )
+
+        # Если есть файлы
+        if message.document or message.photo:
+            if message.document:
+                if message.document.file_size > 20 * 1024 * 1024:  # 20MB
+                    await message.reply_text(
+                        "This bot doesn't work with documents bigger than 20MB"
+                    )
+                    return
+                entry.attached_files.append(message.document.file_name)
+
+            content_hash = get_content_hash(question)
+            state.add_pending_hash(content_hash)
+
+            try:
+                file_processor = FileProcessor()
+                file_content = await file_processor.process_files(
+                    documents=[message.document] if message.document else [],
+                    photos=message.photo if message.photo else [],
+                )
+                if file_content:
+                    state.file_contents[entry.attached_files[-1]] = file_content
+            finally:
+                state.remove_pending_hash(content_hash)
+
+        # Если это голосовое сообщение
+        elif message.voice:
+            content_hash = get_content_hash(str(message.voice.file_id))
+            state.add_pending_hash(content_hash)
+
+            try:
+                voice_file = await message.voice.get_file()
+                with tempfile.NamedTemporaryFile(
+                    suffix=".ogg", delete=False
+                ) as tmp_file:
+                    await voice_file.download_to_drive(tmp_file.name)
+                    voice_path = Path(tmp_file.name)
+                transcription = await voice_processor.transcribe(voice_path)
+                voice_path.unlink()  # Clean up
+
+                if transcription:
+                    entry.content = transcription
+                    state.voice_messages.append(entry)
+                else:
+                    await message.reply_text(
+                        "Sorry, I couldn't understand the voice message."
+                    )
+            finally:
+                state.remove_pending_hash(content_hash)
+
+        # Обычное текстовое сообщение
+        else:
+            logger.info(
+                f"Adding text message to parsing state. "
+                f"From: {entry.sender_id}, "
+                f"Content: {entry.content[:50]}..."
+            )
+            state.messages.append(entry)
+            await message.reply_text("Message added to parsing queue", quote=False)
+
+        # Обработка URL если есть
+        urls = Fetcher.url_re.findall(question)
+        for url in urls:
+            content_hash = get_content_hash(url)
+            state.add_pending_hash(content_hash)
+
+            try:
+                fetcher = Fetcher()
+                content = await fetcher.substitute_urls(url)
+                if content:
+                    state.file_contents[f"url_{len(state.file_contents)}.txt"] = content
+            finally:
+                state.remove_pending_hash(content_hash)
+
+        return
+
     logger.info(
         f"Message received: "
         f"from={update.effective_user.username}, "

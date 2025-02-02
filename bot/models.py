@@ -2,7 +2,8 @@
 
 import datetime as dt
 from collections import deque
-from typing import Generic, Mapping, NamedTuple, Optional, TypeVar
+from typing import Generic, Mapping, Optional, TypeVar, List, Dict, Set
+from dataclasses import dataclass, field
 
 from bot.config import config
 
@@ -37,11 +38,12 @@ class UserData:
         self.message_counter = ExpiringCounter(message_count, period=period)
 
 
-class UserMessage(NamedTuple):
+class UserMessage:
     """Represents a question and an answer to it."""
 
-    question: str
-    answer: str
+    def __init__(self, question: str, answer: str):
+        self.question = question
+        self.answer = answer
 
 
 class UserMessages:
@@ -167,3 +169,36 @@ def format_timedelta(delta: dt.timedelta) -> str:
         hours = round(seconds / 3600, 1)
         return f"{hours} hours"
     return f"{seconds//3600} hours"
+
+
+@dataclass
+class ParsedMessage:
+    """Represents a parsed message with metadata."""
+
+    sender_id: str
+    timestamp: dt.datetime
+    content: str
+    attached_files: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ParsingState:
+    """Состояние парсинга."""
+
+    messages: List[ParsedMessage] = field(default_factory=list)
+    voice_messages: List[ParsedMessage] = field(default_factory=list)
+    file_contents: Dict[str, str] = field(default_factory=dict)
+    pending_hashes: Set[str] = field(default_factory=set)
+    user_id: Optional[int] = None
+
+    def is_processing_complete(self) -> bool:
+        """Returns True if all content has been processed."""
+        return len(self.pending_hashes) == 0
+
+    def add_pending_hash(self, content_hash: str) -> None:
+        """Adds a hash to track pending content processing."""
+        self.pending_hashes.add(content_hash)
+
+    def remove_pending_hash(self, content_hash: str) -> None:
+        """Removes a hash after content has been processed."""
+        self.pending_hashes.discard(content_hash)

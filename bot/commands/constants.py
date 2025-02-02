@@ -24,6 +24,7 @@ BOT_COMMANDS = [
     ("imagine", "generate described image"),
     ("version", "show debug information"),
     ("help", "show help"),
+    ("parsemany", "parse multiple messages into single document"),
 ]
 
 ADMIN_COMMANDS = {

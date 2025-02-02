@@ -4,6 +4,7 @@ import logging
 from typing import Awaitable
 from pathlib import Path
 import tempfile
+from datetime import datetime
 
 from telegram import Chat, Update
 from telegram.ext import CallbackContext
@@ -14,6 +15,8 @@ from bot.config import config
 from bot.models import UserData
 from bot.filters import Filters
 from bot.voice import VoiceProcessor
+from bot.models import ParsedMessage
+from bot.commands.parsemany import active_sessions
 
 logger = logging.getLogger(__name__)
 
@@ -27,111 +30,74 @@ class MessageCommand:
         self.filters = Filters()
 
     async def __call__(self, update: Update, context: CallbackContext) -> None:
-        message = update.message or update.edited_message
-        logger.info(
-            f"Message handler called: "
-            f"from={update.effective_user.username}, "
-            f"text={bool(message.text)}, "
-            f"voice={bool(message.voice)}, "
-            f"document={message.document.file_name if message.document else None}, "
-            f"photo={bool(message.photo)}, "
-            f"caption={bool(message.caption)}"
-        )
+        message = update.message
+        chat_id = message.chat.id
 
-        # Проверяем, групповой ли это чат
-        is_group = message.chat.type != Chat.PRIVATE
+        # Проверяем, есть ли активная сессия парсинга
+        parsing_session = active_sessions.get(chat_id)
+        is_parsing_mode = parsing_session is not None
 
-        # Проверяем взаимодействие с ботом
-        is_bot_mentioned = self.filters.is_bot_mentioned(message, context.bot.username)
-        is_reply_to_bot = self.filters.is_reply_to_bot(message, context.bot.username)
-
-        # В групповом чате обрабатываем только сообщения с упоминанием бота или ответы боту
-        if is_group and not (is_bot_mentioned or is_reply_to_bot):
-            logger.info("Ignoring message in group chat - no bot interaction")
-            return
-
-        # Обработка голосовых сообщений
-        if message.voice:
-            if is_group and not is_reply_to_bot:
-                logger.info("Ignoring voice message in group chat - not a reply to bot")
-                return
-
-        # Обработка файлов
+        # Извлекаем текст и файлы
+        question = ""
         file_content = None
-        if (message.document or message.photo) and config.files.enabled:
-            if is_group and not is_reply_to_bot:
-                logger.info("Ignoring file in group chat - not a reply to bot")
-                return
 
-            file_processor = FileProcessor()
-            file_content = await file_processor.process_files(
-                documents=[message.document] if message.document else [],
-                photos=message.photo if message.photo else [],
-            )
+        if message.text:
+            question = message.text
+        elif message.caption:
+            question = message.caption
 
-        # Получаем текст сообщения
-        if message.chat.type == Chat.PRIVATE:
-            question = await questions.extract_private(message, context)
-        else:
-            question = await questions.extract_group(message, context)
-
-            # Если это ответ с упоминанием бота на сообщение с файлом/голосовым
-            if (
-                is_bot_mentioned
-                and message.reply_to_message
-                and (
-                    message.reply_to_message.voice
-                    or message.reply_to_message.document
-                    or message.reply_to_message.photo
+        # Обрабатываем файлы и фото
+        if message.document or message.photo:
+            if is_parsing_mode:
+                # В режиме парсинга просто добавляем файл в state
+                file_processor = FileProcessor()
+                file_content = await file_processor.process_files(
+                    documents=[message.document] if message.document else [],
+                    photos=message.photo if message.photo else [],
                 )
-            ):
 
-                if message.reply_to_message.voice:
-                    # Обработка голосового из reply
-                    voice_file = await message.reply_to_message.voice.get_file()
-                    with tempfile.NamedTemporaryFile(
-                        suffix=".ogg", delete=False
-                    ) as tmp_file:
-                        await voice_file.download_to_drive(tmp_file.name)
-                        voice_path = Path(tmp_file.name)
-
-                    # Транскрибируем голосовое в текст
-                    voice_content = await self.voice_processor.transcribe(voice_path)
-                    voice_path.unlink()  # Очищаем
-
-                    if voice_content:
-                        file_content = voice_content
+                if file_content:
+                    if message.document:
+                        filename = message.document.file_name
                     else:
-                        await message.reply_text(
-                            "Sorry, I couldn't understand the voice message."
-                        )
-                        return
+                        filename = f"image_{message.photo[-1].file_unique_id}.txt"
+                    parsing_session.state.file_contents[filename] = file_content
+                    await message.reply_text(f"Added file: {filename}")
+                return
+            else:
+                # Обычный режим - сначала сохраняем контент
+                file_processor = FileProcessor()
+                file_content = await file_processor.process_files(
+                    documents=[message.document] if message.document else [],
+                    photos=message.photo if message.photo else [],
+                )
+                if file_content:
+                    # Сохраняем контент в данных пользователя
+                    user = UserData(context.user_data)
+                    user.data["last_file_content"] = file_content
 
-                elif (
-                    message.reply_to_message.document or message.reply_to_message.photo
-                ):
-                    # Обработка файла из reply
-                    file_processor = FileProcessor()
-                    file_content = await file_processor.process_files(
-                        documents=(
-                            [message.reply_to_message.document]
-                            if message.reply_to_message.document
-                            else []
-                        ),
-                        photos=(
-                            message.reply_to_message.photo
-                            if message.reply_to_message.photo
-                            else []
-                        ),
+                    # Спрашиваем что делать с файлом
+                    await message.reply_text(
+                        "This is a file. What should I do with it?"
                     )
+                    return
 
-        # Обработка файлового контента
-        if file_content and not question:
-            user = UserData(context.user_data)
-            user.data["last_file_content"] = file_content
-            await message.reply_text("This is a file. What should I do with it?")
+        # Добавляем сообщение в парсинг сессию, если она активна
+        if is_parsing_mode and (question or file_content):
+            timestamp = datetime.fromtimestamp(message.date.timestamp())
+            parsed_message = ParsedMessage(
+                sender_id=message.from_user.username or str(message.from_user.id),
+                timestamp=timestamp,
+                content=question,
+                attached_files=[],
+            )
+            parsing_session.state.messages.append(parsed_message)
+            logger.info(
+                f"Adding text message to parsing state. From: {parsed_message.sender_id}, Content: {question[:20]}..."
+            )
             return
 
+        # Обычная обработка сообщения
         if question and not file_content:
             user = UserData(context.user_data)
             file_content = user.data.pop("last_file_content", None)
