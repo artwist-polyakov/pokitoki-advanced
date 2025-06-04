@@ -69,11 +69,10 @@ class Filters:
         if not entities:
             return False
 
+        source = message.text if message.text is not None else message.caption or ""
         for entity in entities:
             if entity.type == MessageEntity.MENTION:
-                mention_text = message.text[
-                    entity.offset : entity.offset + entity.length
-                ]
+                mention_text = source[entity.offset : entity.offset + entity.length]
                 if mention_text.lower() == f"@{bot_username.lower()}":
                     return True
         return False

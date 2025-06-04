@@ -73,7 +73,7 @@ class MessageCommand:
         if message.chat.type == Chat.PRIVATE:
             question = await questions.extract_private(message, context)
         else:
-            question = await questions.extract_group(message, context)
+            question, message = await questions.extract_group(message, context)
 
             # Если это ответ с упоминанием бота на сообщение с файлом/голосовым
             if (

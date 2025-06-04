@@ -25,38 +25,46 @@ async def extract_private(message: Message, context: CallbackContext) -> Optiona
     return question
 
 
-async def extract_group(message: Message, context: CallbackContext) -> str:
-    """Извлекает вопрос из сообщения в групповом чате."""
-    text = await _extract_text(message, context)
+async def extract_group(message: Message, context: CallbackContext) -> tuple[str, Message]:
+    """Extracts a question from a group chat message."""
+    base_text = message.text or message.caption or ""
+    doc_suffix = ""
+    if message.document:
+        file = await context.bot.get_file(message.document.file_id)
+        content = await file.download_as_bytearray()
+        try:
+            decoded = content.decode()
+        except Exception:
+            decoded = ""
+        if decoded:
+            doc_suffix = f"\n\n{message.document.file_name}:\n```\n{decoded}\n```"
+    text = base_text + doc_suffix
 
-    # Проверяем взаимодействие с ботом
     is_bot_mentioned = filters.is_bot_mentioned(message, context.bot.username)
     is_reply_to_bot = filters.is_reply_to_bot(message, context.bot.username)
 
     if not (is_bot_mentioned or is_reply_to_bot):
-        return ""
+        return "", message
 
-    # Если это ответ боту
     if is_reply_to_bot:
-        return f"+ {text}" if text else ""
+        return (f"+ {text}" if text else "", message)
 
-    # Если это упоминание бота
     if is_bot_mentioned:
-        # Убираем упоминание из текста
+        clean = base_text
         for entity in message.entities or message.caption_entities or []:
             if entity.type == MessageEntity.MENTION:
-                text = (
-                    text[: entity.offset] + text[entity.offset + entity.length :]
+                clean = (
+                    clean[: entity.offset] + clean[entity.offset + entity.length :]
                 ).strip()
+        text = clean + doc_suffix
 
-        # Если это ответ на сообщение
         if message.reply_to_message:
             reply_text = await _extract_text(message.reply_to_message, context)
-            return f"{text}: {reply_text}" if text else reply_text
+            return (f"{text}: {reply_text}" if text else reply_text, message.reply_to_message)
 
-        return text
+        return text, message
 
-    return ""
+    return "", message
 
 
 def extract_prev(message: Message, context: CallbackContext) -> str:
@@ -101,8 +109,15 @@ def prepare(question: str) -> tuple[str, bool]:
 
 async def _extract_text(message: Message, context: CallbackContext) -> str:
     """Extracts text from a text message or a document message."""
-    if message.text:
-        return message.text
-    if message.caption:
-        return message.caption
-    return ""
+    text = message.text or message.caption or ""
+
+    if message.document:
+        file = await context.bot.get_file(message.document.file_id)
+        content = await file.download_as_bytearray()
+        try:
+            decoded = content.decode()
+        except Exception:
+            decoded = ""
+        if decoded:
+            text += f"\n\n{message.document.file_name}:\n```\n{decoded}\n```"
+    return text
