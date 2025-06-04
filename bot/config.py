@@ -190,7 +190,7 @@ class Config:
         )
 
         self.scrapdo = Scrapdo(
-            token=src["scrapdo"]["token"],
+            token=src.get("scrapdo", {}).get("token", ""),
         )
 
         # Conversation settings.
