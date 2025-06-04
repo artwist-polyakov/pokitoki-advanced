@@ -1,7 +1,7 @@
 # ⚠️ It is fork of [pokitoki](https://github.com/nalgeon/pokitoki) with additional features
 
-- Here is available web-sites scrapping via scrape.do API (provides 1000 requests/mo for free )
-- Voice messsages support, with optional TTS-output (hear answer instead of reading).
+- Supports website scraping via scrape.do API (provides 1000 requests/mo for free)
+- Voice messages support, with optional TTS-output (hear answer instead of reading).
 - Documents support.
 
 
