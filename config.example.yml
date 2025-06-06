@@ -31,6 +31,7 @@ openai:
 
     # OpenAI model name.
     # See https://platform.openai.com/docs/models for description.
+    # The "o3-mini" model provides a 200k token context window.
     model: "gpt-4o-mini"
 
     # Context window size in tokens.
