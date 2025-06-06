@@ -24,7 +24,9 @@ class VoiceProcessor:
         self.max_file_size = (
             config.voice.max_file_size * 1024 * 1024
         )  # Convert MB to bytes
-        self.client = AsyncOpenAI(api_key=config.openai.api_key)
+        self.client = AsyncOpenAI(
+            api_key=config.openai.api_key, base_url=config.openai.url
+        )
 
     async def transcribe(self, voice_file: Path) -> Optional[str]:
         """Transcribes voice message to text using Whisper API."""
