@@ -60,7 +60,7 @@ class Model:
     ) -> str:
         """Asks the language model a question and returns an answer."""
         model = self.name or config.openai.model
-        prompt_role = ROLE_OVERRIDES.get(model) or "developer"
+        prompt_role = ROLE_OVERRIDES.get(model) or "system"
         params_func = PARAM_OVERRIDES.get(model) or (lambda params: params)
 
         n_input = _calc_n_input(model, n_output=config.openai.params["max_tokens"])
