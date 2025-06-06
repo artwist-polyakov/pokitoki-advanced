@@ -131,6 +131,16 @@ To return to the default prompt, use `/prompt reset`.
 
 The `/prompt` command in group chats is only available to admins - users listed in the `telegram.admins` property.
 
+## Model selection
+
+To change the model for the current chat, use the `/model` command:
+
+> 🧑 /model gpt-4o
+
+To return to the default model, use `/model reset`.
+
+Only admins - users listed in the `telegram.admins` property - can change the model in any chat.
+
 ## Image generation
 
 Use the `/imagine` command to generate an image using the DALL-E 3 model from OpenAI:
