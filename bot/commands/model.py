@@ -24,6 +24,11 @@ class ModelCommand:
 
         if update.effective_user.username not in config.telegram.admins:
             # Only admins are allowed to change the model
+            await message.reply_text(
+                "You don't have permission to change the model.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
             return
 
         chat = ChatData(context.chat_data)

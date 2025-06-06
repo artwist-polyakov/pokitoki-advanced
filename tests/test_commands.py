@@ -306,7 +306,9 @@ class ModelPrivateTest(unittest.IsolatedAsyncioTestCase, Helper):
         user = User(id=2, first_name="Bob", is_bot=False, username="bob")
         update = self._create_update(11, "/model gpt-4", user=user)
         await self.command(update, self.context)
-        self.assertEqual(self.bot.text, "")
+        self.assertEqual(
+            self.bot.text, "You don't have permission to change the model."
+        )
         self.assertEqual(self.application.chat_data[1], {})
 
 
@@ -331,7 +333,9 @@ class ModelGroupTest(unittest.IsolatedAsyncioTestCase, Helper):
     async def test_not_allowed(self):
         update = self._create_update(11, "/model@bot gpt-4", user=self.bob)
         await self.command(update, self.context)
-        self.assertEqual(self.bot.text, "")
+        self.assertEqual(
+            self.bot.text, "You don't have permission to change the model."
+        )
         self.assertEqual(self.application.chat_data[1], {})
 
 
