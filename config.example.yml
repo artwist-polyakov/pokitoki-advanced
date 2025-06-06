@@ -34,7 +34,7 @@ openai:
 
     # OpenAI model name.
     # See https://platform.openai.com/docs/models for description.
-    # Example: gpt-4o-mini, o3-mini
+    # Example: gpt-4o-mini, o4-mini, gpt-4.1
     model: "gpt-4o-mini"
 
     # Image generation model name.
