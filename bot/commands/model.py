@@ -28,6 +28,7 @@ class ModelCommand:
                 "You don't have permission to change the model.",
                 parse_mode=ParseMode.MARKDOWN,
             )
+
             return
 
         chat = ChatData(context.chat_data)
