@@ -28,6 +28,8 @@ class OpenAI:
     window: int
     prompt: str
     params: dict
+    url: str
+    image_model: str
 
     default_model = "gpt-4o-mini"
     default_window = 4096
@@ -38,6 +40,8 @@ class OpenAI:
         "frequency_penalty": 0,
         "max_tokens": 1000,
     }
+    default_url = "https://api.openai.com/v1"
+    default_image_model = "dall-e-3"
 
     def __init__(
         self,
@@ -46,6 +50,8 @@ class OpenAI:
         window: int,
         prompt: str,
         params: dict,
+        url: str = default_url,
+        image_model: str = default_image_model,
     ) -> None:
         self.api_key = api_key
         self.model = model or self.default_model
@@ -53,6 +59,8 @@ class OpenAI:
         self.prompt = prompt or self.default_prompt
         self.params = self.default_params.copy()
         self.params.update(params)
+        self.url = url or self.default_url
+        self.image_model = image_model or self.default_image_model
 
 
 @dataclass
@@ -183,6 +191,8 @@ class Config:
             window=src["openai"].get("window"),
             prompt=src["openai"].get("prompt"),
             params=src["openai"].get("params") or {},
+            url=src["openai"].get("url"),
+            image_model=src["openai"].get("image_model"),
         )
 
         self.scrapdo = Scrapdo(

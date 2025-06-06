@@ -1,13 +1,13 @@
 import unittest
 
-from bot.ai import chatgpt
+from bot.ai import chat
 from bot.config import config
 from bot.models import UserMessage
 
 
 class ModelTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.model = chatgpt.Model()
+        self.model = chat.Model()
 
     def test_generate_messages(self):
         history = [UserMessage("Hello", "Hi"), UserMessage("Is it cold today?", "Yep!")]
@@ -41,7 +41,7 @@ class ShortenTest(unittest.TestCase):
             {"role": "system", "content": "You are an AI assistant."},
             {"role": "user", "content": "Hello"},
         ]
-        shortened = chatgpt.shorten(messages, length=11)
+        shortened = chat.shorten(messages, length=11)
         self.assertEqual(shortened, messages)
 
     def test_remove_messages_1(self):
@@ -51,7 +51,7 @@ class ShortenTest(unittest.TestCase):
             {"role": "assistant", "content": "My name is Alice."},
             {"role": "user", "content": "Is it cold today?"},
         ]
-        shortened = chatgpt.shorten(messages, length=11)
+        shortened = chat.shorten(messages, length=11)
         self.assertEqual(
             shortened,
             [
@@ -67,7 +67,7 @@ class ShortenTest(unittest.TestCase):
             {"role": "assistant", "content": "My name is Alice."},
             {"role": "user", "content": "Is it cold today?"},
         ]
-        shortened = chatgpt.shorten(messages, length=20)
+        shortened = chat.shorten(messages, length=20)
         self.assertEqual(
             shortened,
             [
@@ -82,7 +82,7 @@ class ShortenTest(unittest.TestCase):
             {"role": "system", "content": "You are an AI assistant."},
             {"role": "user", "content": "Is it cold today? I think it's rather cold"},
         ]
-        shortened = chatgpt.shorten(messages, length=11)
+        shortened = chat.shorten(messages, length=11)
         self.assertEqual(
             shortened,
             [

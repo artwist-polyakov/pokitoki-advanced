@@ -1,1 +1,1 @@
-from . import chatgpt, dalle  # noqa: F401
+from . import chat, images  # noqa: F401

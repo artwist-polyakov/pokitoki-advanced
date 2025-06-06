@@ -10,7 +10,7 @@ import os
 import sys
 import textwrap
 
-import bot.ai.chatgpt
+import bot.ai.chat
 from bot.config import config
 from bot.fetcher import Fetcher
 
@@ -29,7 +29,7 @@ async def main(question):
 
 def init_model():
     name = os.getenv("OPENAI_MODEL") or config.openai.model
-    return bot.ai.chatgpt.Model(name)
+    return bot.ai.chat.Model(name)
 
 
 if __name__ == "__main__":

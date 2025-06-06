@@ -8,7 +8,7 @@ from openai import AsyncOpenAI
 
 from bot.config import config
 
-openai = AsyncOpenAI(api_key=config.openai.api_key)
+openai = AsyncOpenAI(api_key=config.openai.api_key, base_url=config.openai.url)
 
 encoding = tiktoken.get_encoding("cl100k_base")
 logger = logging.getLogger(__name__)

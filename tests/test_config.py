@@ -26,6 +26,8 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(config.openai.params["presence_penalty"], 0)
         self.assertEqual(config.openai.params["frequency_penalty"], 0)
         self.assertEqual(config.openai.params["max_tokens"], 1000)
+        self.assertEqual(config.openai.url, "https://api.openai.com/v1")
+        self.assertEqual(config.openai.image_model, "dall-e-3")
 
         self.assertEqual(config.conversation.depth, 5)
         self.assertEqual(config.imagine.enabled, "none")
@@ -47,6 +49,8 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(data["telegram"]["chat_ids"], [])
         self.assertEqual(data["openai"]["api_key"], src["openai"]["api_key"])
         self.assertEqual(data["openai"]["model"], src["openai"]["model"])
+        self.assertEqual(data["openai"]["url"], "https://api.openai.com/v1")
+        self.assertEqual(data["openai"]["image_model"], "dall-e-3")
         self.assertEqual(data["conversation"]["depth"], src["conversation"]["depth"])
         self.assertEqual(data["imagine"]["enabled"], src["imagine"]["enabled"])
 
