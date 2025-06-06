@@ -34,7 +34,6 @@ openai:
     model: "gpt-4o-mini"
 
     # Context window size in tokens.
-    # Applies only to custom models.
     window: 4096
 
     # Model prompt.
