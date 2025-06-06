@@ -85,6 +85,9 @@ def add_handlers(application: Application):
             "config", commands.Config(filters), filters=filters.admins_private
         )
     )
+    application.add_handler(
+        CommandHandler("model", commands.Model(), filters=filters.admins)
+    )
 
     # message-related commands
     application.add_handler(
@@ -235,7 +238,9 @@ async def reply_to(
                 )
                 return
 
-        asker = askers.create(question)
+        chat = ChatData(context.chat_data)
+        model_name = chat.model or config.openai.model
+        asker = askers.create(model_name, question)
         if message.chat.type == Chat.PRIVATE and message.forward_date:
             answer = "This is a forwarded message. What should I do with it?"
         else:

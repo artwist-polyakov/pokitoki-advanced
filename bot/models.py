@@ -24,6 +24,14 @@ class ChatData:
     def prompt(self, value: str) -> str:
         self.data["prompt"] = value
 
+    @property
+    def model(self) -> str:
+        return self.data.get("model") or ""
+
+    @model.setter
+    def model(self, value: str) -> None:
+        self.data["model"] = value
+
 
 class UserData:
     """Represents data associated with a specific user."""

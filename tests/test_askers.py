@@ -13,10 +13,10 @@ from tests.mocks import FakeApplication, FakeBot, FakeDalle, FakeGPT
 class TextAskerTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.ai = FakeGPT()
-        TextAsker.model = self.ai
+        TextAsker.model_factory = lambda name, ai=self.ai: ai
 
     async def test_ask(self):
-        asker = TextAsker()
+        asker = TextAsker(model="gpt-4")
         await asker.ask(
             prompt="Answer me", question="What is your name?", history=[("Hello", "Hi")]
         )
@@ -26,7 +26,7 @@ class TextAskerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_reply(self):
         message, context = _create_message()
-        asker = TextAsker()
+        asker = TextAsker(model="gpt-4")
         await asker.reply(message, context, answer="My name is ChatGPT.")
         self.assertEqual(context.bot.text, "My name is ChatGPT.")
 
@@ -82,11 +82,11 @@ class ImagineAskerTest(unittest.IsolatedAsyncioTestCase):
 
 class CreateTest(unittest.TestCase):
     def test_text_asker(self):
-        asker = askers.create("What is your name?")
+        asker = askers.create("gpt-4", "What is your name?")
         self.assertIsInstance(asker, TextAsker)
 
     def test_imagine_asker(self):
-        asker = askers.create("/imagine a cat")
+        asker = askers.create("gpt-4", "/imagine a cat")
         self.assertIsInstance(asker, ImagineAsker)
 
 

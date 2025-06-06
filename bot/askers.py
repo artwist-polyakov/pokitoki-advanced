@@ -29,7 +29,10 @@ class Asker:
 class TextAsker(Asker):
     """Works with chat completion AI."""
 
-    model = ai.chat.Model()
+    model_factory = ai.chat.Model
+
+    def __init__(self, model: str) -> None:
+        self.model = self.__class__.model_factory(model)
 
     async def ask(self, prompt: str, question: str, history: list[tuple[str, str]]) -> str:
         """Asks AI a question."""
@@ -95,8 +98,8 @@ class ImagineAsker(Asker):
         return caption
 
 
-def create(question: str) -> Asker:
+def create(model: str, question: str) -> Asker:
     """Creates a new asker based on the question asked."""
     if question.startswith("/imagine"):
         return ImagineAsker()
-    return TextAsker()
+    return TextAsker(model)
