@@ -51,6 +51,7 @@ class FakeBot:
             can_read_all_group_messages=True,
         )
         self.text = ""
+        self.documents: list[tuple[str, str]] = []
 
     @property
     def username(self) -> str:
@@ -77,6 +78,7 @@ class FakeBot:
         self, chat_id: int, document: object, caption: str, filename: str, **kwargs
     ) -> None:
         self.text = f"{caption}: {filename}"
+        self.documents.append((caption, filename))
 
     async def send_photo(self, chat_id: int, photo: str, caption: str = None, **kwargs) -> None:
         self.text = f"{caption}: {photo}"

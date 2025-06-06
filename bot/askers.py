@@ -42,17 +42,25 @@ class TextAsker(Asker):
             await message.reply_text(html_answer, parse_mode=ParseMode.HTML)
             return
 
-        doc = io.StringIO(answer)
         caption = (
             textwrap.shorten(answer, width=255, placeholder="...")
             + " (see attachment for the rest)"
         )
         reply_to_message_id = message.id if message.chat.type != Chat.PRIVATE else None
+        md_doc = io.StringIO(answer)
         await context.bot.send_document(
             chat_id=message.chat_id,
             caption=caption,
             filename=f"{message.id}.md",
-            document=doc,
+            document=md_doc,
+            reply_to_message_id=reply_to_message_id,
+        )
+        html_doc = io.StringIO(html_answer)
+        await context.bot.send_document(
+            chat_id=message.chat_id,
+            caption=caption,
+            filename=f"{message.id}.html",
+            document=html_doc,
             reply_to_message_id=reply_to_message_id,
         )
 
