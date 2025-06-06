@@ -86,7 +86,9 @@ def add_handlers(application: Application):
         )
     )
     application.add_handler(
-        CommandHandler("model", commands.Model(), filters=filters.admins)
+        CommandHandler(
+            "model", commands.Model(), filters=filters.users_or_chats
+        )
     )
 
     # message-related commands
