@@ -3,6 +3,7 @@
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
+from urllib import parse
 
 from bot.config import config
 
@@ -46,10 +47,12 @@ class VersionCommand:
             text += f"\n\n{constants.PRIVACY_MESSAGE}"
 
         # AI information
+        provider = parse.urlparse(config.openai.url).hostname
         text += (
             "\n\n<pre>"
             "AI information:\n"
             f"- model: {config.openai.model}\n"
+            f"- provider: {provider}\n"
             f"- history depth: {config.conversation.depth}\n"
             f"- imagine: {config.imagine.enabled}\n"
             f"- shortcuts: {', '.join(config.shortcuts.keys())}"
