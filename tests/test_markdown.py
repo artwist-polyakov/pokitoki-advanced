@@ -25,7 +25,7 @@ See [Documentation](https://github.com/nalgeon/sqlean) for reference.
 
 TEXT_HTML = r"""You can easily regular expressions them using the <code>sqlean-regexp</code> extension.
 
-&gt; **Note**. Unlike other DBMS, adding extensions to SQLite is a breeze.
+&gt; <b>Note</b>. Unlike other DBMS, adding extensions to SQLite is a breeze.
 
 With <code>sqlean-regexp</code>, matching a string against a pattern becomes as easy as:
 
@@ -57,3 +57,14 @@ class Test(unittest.TestCase):
         self.assertEqual(text, "one `two three")
         text = markdown.to_html("one `two\n` three")
         self.assertEqual(text, "one `two\n` three")
+
+    def test_bold(self):
+        text = markdown.to_html("one **two** three")
+        self.assertEqual(text, "one <b>two</b> three")
+        # malformed pattern should stay untouched
+        text = markdown.to_html("**foo *bar** baz")
+        self.assertEqual(text, "**foo *bar** baz")
+
+    def test_bullet(self):
+        text = markdown.to_html("*   item1\n* item2")
+        self.assertEqual(text, "— item1\n* item2")
