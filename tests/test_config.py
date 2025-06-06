@@ -20,12 +20,10 @@ class ConfigTest(unittest.TestCase):
 
         self.assertEqual(config.openai.api_key, "oa-1234")
         self.assertEqual(config.openai.model, "gpt-4")
-        self.assertEqual(config.openai.window, 4096)
+        self.assertEqual(config.openai.window, 128000)
         self.assertTrue(config.openai.prompt, "You are an AI assistant.")
         self.assertEqual(config.openai.params["temperature"], 0.7)
-        self.assertEqual(config.openai.params["presence_penalty"], 0)
-        self.assertEqual(config.openai.params["frequency_penalty"], 0)
-        self.assertEqual(config.openai.params["max_tokens"], 1000)
+        self.assertEqual(config.openai.params["max_tokens"], 4096)
         self.assertEqual(config.openai.url, "https://api.openai.com/v1")
         self.assertEqual(config.openai.image_model, "dall-e-3")
 

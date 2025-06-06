@@ -32,13 +32,11 @@ class OpenAI:
     image_model: str
 
     default_model = "gpt-4o-mini"
-    default_window = 4096
+    default_window = 128000
     default_prompt = "You are an AI assistant."
     default_params = {
         "temperature": 0.7,
-        "presence_penalty": 0,
-        "frequency_penalty": 0,
-        "max_tokens": 1000,
+        "max_tokens": 4096,
     }
     default_url = "https://api.openai.com/v1"
     default_image_model = "dall-e-3"
