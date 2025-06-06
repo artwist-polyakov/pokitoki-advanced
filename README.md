@@ -187,6 +187,7 @@ Bot information:
 
 AI information:
 - model: gpt-3.5-turbo
+- provider: api.openai.com
 - history depth: 3
 - imagine: True
 - shortcuts: bugfix, proofread, summarize, translate
