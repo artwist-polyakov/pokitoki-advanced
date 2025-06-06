@@ -63,11 +63,11 @@ class MessageCommand:
                 logger.info("Ignoring file in group chat - not a reply to bot")
                 return
 
-            file_processor = FileProcessor()
-            file_content = await file_processor.process_files(
-                documents=[message.document] if message.document else [],
-                photos=message.photo if message.photo else [],
-            )
+            with FileProcessor() as file_processor:
+                file_content = await file_processor.process_files(
+                    documents=[message.document] if message.document else [],
+                    photos=message.photo if message.photo else [],
+                )
 
         # Получаем текст сообщения
         if message.chat.type == Chat.PRIVATE:
@@ -111,19 +111,19 @@ class MessageCommand:
                     message.reply_to_message.document or message.reply_to_message.photo
                 ):
                     # Обработка файла из reply
-                    file_processor = FileProcessor()
-                    file_content = await file_processor.process_files(
-                        documents=(
-                            [message.reply_to_message.document]
-                            if message.reply_to_message.document
-                            else []
-                        ),
-                        photos=(
-                            message.reply_to_message.photo
-                            if message.reply_to_message.photo
-                            else []
-                        ),
-                    )
+                    with FileProcessor() as file_processor:
+                        file_content = await file_processor.process_files(
+                            documents=(
+                                [message.reply_to_message.document]
+                                if message.reply_to_message.document
+                                else []
+                            ),
+                            photos=(
+                                message.reply_to_message.photo
+                                if message.reply_to_message.photo
+                                else []
+                            ),
+                        )
 
         # Обработка файлового контента
         if file_content and not question:

@@ -31,6 +31,18 @@ class FileProcessor:
         # Создаем пул потоков
         self.executor = concurrent.futures.ThreadPoolExecutor()
 
+    def close(self) -> None:
+        """Shuts down the executor."""
+        if self.executor:
+            self.executor.shutdown(wait=False)
+            self.executor = None
+
+    def __enter__(self) -> "FileProcessor":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
     async def process_files(
         self, documents: List[Document], photos: List[PhotoSize]
     ) -> Optional[str]:
@@ -146,4 +158,4 @@ class FileProcessor:
 
     def __del__(self):
         """Cleanup executor on deletion."""
-        self.executor.shutdown(wait=False)
+        self.close()
