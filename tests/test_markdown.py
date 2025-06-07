@@ -64,6 +64,9 @@ class Test(unittest.TestCase):
         # malformed pattern should stay untouched
         text = markdown.to_html("**foo *bar** baz")
         self.assertEqual(text, "**foo *bar** baz")
+        # inline code with asterisks should be preserved
+        text = markdown.to_html("operator `**` is so ** powerful")
+        self.assertEqual(text, "operator <code>**</code> is so ** powerful")
 
     def test_bullet(self):
         text = markdown.to_html("*   item1\n* item2")
