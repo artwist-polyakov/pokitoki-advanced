@@ -31,7 +31,7 @@ The bot acts as your personal assistant:
 
 To allow other users to use the bot, list them in the `telegram.usernames` config property.
 
-The bot has a terrible memory, so don't expect it to remember any chat context by default. You can, however, reply with a follow-up question (`Ctrl/Cmd + ↑`). Alternatively, use a plus sign to follow up:
+The bot has a terrible memory by design. Each new question is answered from scratch unless you reply with a follow-up or start the message with a `+` sign. Even then, only the most recent `conversation.depth` question–answer pairs are kept—anything older is discarded. You can adjust this limit via the `conversation.depth` setting in [config.example.yml](config.example.yml):
 
 > 🧑 Yesterday, all my troubles seemed so far away
 >
