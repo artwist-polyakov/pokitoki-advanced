@@ -108,6 +108,9 @@ class Fetcher:
             else:
                 raise req_err
 
+        except Exception as exc:
+            return f"Failed to fetch ({exc.__class__.__module__}.{exc.__class__.__qualname__})"
+
     async def _fetch_via_scrapdo(self, url: str, token: str) -> str:
         """
         Makes a request to Scrap.do (https://scrape.do/docs):

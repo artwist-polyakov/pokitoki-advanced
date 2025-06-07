@@ -6,12 +6,15 @@ from bot.fetcher import Content, Fetcher
 
 
 class FakeClient:
-    def __init__(self, responses: dict[str, Response]) -> None:
+    def __init__(self, responses: dict[str, Response | Exception]) -> None:
         self.responses = responses
 
     async def get(self, url: str) -> Response:
+        value = self.responses[url]
+        if isinstance(value, Exception):
+            raise value
         request = Request(method="GET", url=url)
-        template = self.responses[url]
+        template = value
         return Response(
             status_code=template.status_code,
             headers=template.headers,
@@ -74,6 +77,11 @@ second
         text = 'Extract "https://example.org/first"'
         urls = self.fetcher._extract_urls(text)
         self.assertEqual(urls, [])
+
+    async def test_fetch_url(self):
+        self.fetcher.client = FakeClient({"https://example.org/boom": RuntimeError("boom")})
+        result = await self.fetcher._fetch_url("https://example.org/boom")
+        self.assertEqual(result, "Failed to fetch (builtins.RuntimeError)")
 
 
 class ContentTest(unittest.TestCase):
