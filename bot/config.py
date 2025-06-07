@@ -99,7 +99,7 @@ class Imagine:
         self.enabled = (
             enabled
             if enabled in ("none", "users_only", "users_and_groups")
-            else "users_only"
+            else "none"
         )
 
 
