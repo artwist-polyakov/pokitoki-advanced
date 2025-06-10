@@ -285,7 +285,6 @@ git pull
 docker compose up --build --detach
 ```
 
-For older Docker distributions, use `docker-compose` and specify the file: `docker-compose -f compose.yml up --build --detach`.
 
 ## Development setup
 
