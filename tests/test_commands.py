@@ -1,12 +1,15 @@
 import datetime as dt
 import unittest
+import asyncio
+from unittest.mock import AsyncMock, patch
 
-from telegram import Chat, Message, MessageEntity, Update, User
+from telegram import Chat, Message, MessageEntity, Update, User, PhotoSize
 from telegram.constants import ChatType
 from telegram.ext import CallbackContext
 from telegram.ext import filters as tg_filters
 
 from bot import askers, bot, commands, models
+from bot.file_processor import FileProcessor
 from bot.config import config
 from bot.filters import Filters
 from tests.mocks import FakeApplication, FakeBot, FakeDalle, FakeGPT
@@ -460,6 +463,34 @@ class MessageTest(unittest.IsolatedAsyncioTestCase, Helper):
         await self.command(update, self.context)
         self.assertTrue(self.bot.text.startswith("⚠️ builtins.Exception:"))
         self.assertTrue("connection timeout" in self.bot.text)
+
+
+class MessageMediaGroupTest(unittest.IsolatedAsyncioTestCase, Helper):
+    def setUp(self):
+        askers.TextAsker.model_factory = lambda name: FakeGPT()
+        self.bot = FakeBot("bot")
+        self.chat = Chat(id=1, type=ChatType.PRIVATE)
+        self.chat.set_bot(self.bot)
+        self.application = FakeApplication(self.bot)
+        self.context = CallbackContext(self.application, chat_id=1, user_id=1)
+        self.user = User(id=1, first_name="Alice", is_bot=False, username="alice")
+        self.command = commands.Message(bot.reply_to)
+        config.telegram.usernames = ["alice"]
+        patcher = patch.object(FileProcessor, "process_files", AsyncMock(return_value="files"))
+        self.process_mock = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    async def test_album(self):
+        photo1 = PhotoSize(file_id="p1", file_unique_id="pu1", width=10, height=10, file_size=10)
+        photo2 = PhotoSize(file_id="p2", file_unique_id="pu2", width=10, height=10, file_size=10)
+        update1 = self._create_update(11, caption="Look", photo=[photo1], media_group_id="g")
+        update2 = self._create_update(12, photo=[photo2], media_group_id="g")
+        await self.command(update1, self.context)
+        await self.command(update2, self.context)
+        await asyncio.sleep(1.1)
+        self.process_mock.assert_awaited_once()
+        args, kwargs = self.process_mock.call_args
+        self.assertEqual(len(kwargs["photos"]), 2)
 
 
 class MessageGroupTest(unittest.IsolatedAsyncioTestCase, Helper):
