@@ -5,6 +5,7 @@ import logging
 from typing import Awaitable
 from pathlib import Path
 import tempfile
+import os
 
 from telegram import Chat, Update, Message
 from telegram.ext import CallbackContext
@@ -26,8 +27,9 @@ class MessageCommand:
         self.reply_func = reply_func
         self.voice_processor = VoiceProcessor()
         self.filters = Filters()
-        self._media_buffers: dict[str, list[tuple[Update, Message]]] = {}
-        self._media_tasks: dict[str, asyncio.Task] = {}
+        self._buffers: dict[str, list[tuple[Update, Message]]] = {}
+        self._tasks: dict[str, asyncio.Task] = {}
+        self.debounce_sec = float(os.getenv("DEBOUNCE_WINDOW", "1"))
 
     async def __call__(self, update: Update, context: CallbackContext) -> None:
         message = update.message or update.edited_message
@@ -42,21 +44,20 @@ class MessageCommand:
             f"media_group_id={message.media_group_id}"
         )
 
-        if message.media_group_id:
-            key = message.media_group_id
-            self._media_buffers.setdefault(key, []).append((update, message))
-            if key not in self._media_tasks:
-                self._media_tasks[key] = asyncio.create_task(
-                    self._flush_media(key, context)
-                )
+        key = message.media_group_id or f"{message.chat.id}:{update.effective_user.id}"
+        self._buffers.setdefault(key, []).append((update, message))
+        task = self._tasks.get(key)
+        if task:
+            task.cancel()
+        self._tasks[key] = asyncio.create_task(self._flush(key, context))
+
+    async def _flush(self, key: str, context: CallbackContext) -> None:
+        try:
+            await asyncio.sleep(self.debounce_sec)
+        except asyncio.CancelledError:
             return
-
-        await self._process(update, context, message)
-
-    async def _flush_media(self, key: str, context: CallbackContext) -> None:
-        await asyncio.sleep(1)
-        data = self._media_buffers.pop(key, [])
-        self._media_tasks.pop(key, None)
+        data = self._buffers.pop(key, [])
+        self._tasks.pop(key, None)
         if not data:
             return
         updates, messages = zip(*data)
@@ -135,6 +136,8 @@ class MessageCommand:
                 text=text_override,
                 from_user=message.from_user,
                 reply_to_message=message.reply_to_message,
+                entities=message.entities,
+                caption_entities=message.caption_entities,
             )
             text_msg.set_bot(context.bot)
         else:
