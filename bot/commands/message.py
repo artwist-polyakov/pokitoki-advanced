@@ -76,13 +76,14 @@ class MessageCommand:
             if msg.text:
                 texts.append(msg.text)
         text = "\n".join(texts).strip() if texts else None
-        await self._process(update, context, base, docs, photos, text)
+        await self._process(update, context, base, key, docs, photos, text)
 
     async def _process(
         self,
         update: Update,
         context: CallbackContext,
         message: Message,
+        key: str,
         documents: list | None = None,
         photos: list | None = None,
         text_override: str | None = None,
@@ -187,17 +188,27 @@ class MessageCommand:
                         )
 
         # Обработка файлового контента
+        user = UserData(context.user_data)
         if file_content and not question:
-            user = UserData(context.user_data)
-            user.data["last_file_content"] = file_content
-            await message.reply_text("This is a file. What should I do with it?")
+            prev = user.data.get("last_file_content")
+            user.data["last_file_content"] = (
+                f"{prev}\n\n{file_content}" if prev else file_content
+            )
+            if not self._buffers.get(key):
+                await message.reply_text(
+                    "This is a file. What should I do with it?"
+                )
             return
 
         if question and not file_content:
-            user = UserData(context.user_data)
-            file_content = user.data.pop("last_file_content", None)
-            if file_content:
-                question = f"{question}\n\n{file_content}"
+            stored = user.data.pop("last_file_content", None)
+            if stored:
+                file_content = stored
+                question = f"{question}\n\n{stored}"
+        elif file_content:
+            stored = user.data.pop("last_file_content", None)
+            if stored:
+                file_content = f"{stored}\n\n{file_content}"
 
         if not file_content and not question:
             logger.info("No content extracted, ignoring message")
