@@ -56,10 +56,9 @@ class FileProcessor:
         for doc in documents:
             tasks.append(self._process_document(doc))
 
-        # Process photos - берем только самое большое фото
-        if photos:
-            largest_photo = max(photos, key=lambda p: p.file_size)
-            tasks.append(self._process_photo(largest_photo))
+        # Process all photos
+        for photo in photos:
+            tasks.append(self._process_photo(photo))
 
         # Wait for all files to be processed
         results = await asyncio.gather(*tasks, return_exceptions=True)
