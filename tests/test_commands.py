@@ -1,12 +1,15 @@
 import datetime as dt
 import unittest
+import asyncio
+from unittest.mock import AsyncMock, patch
 
-from telegram import Chat, Message, MessageEntity, Update, User
+from telegram import Chat, Message, MessageEntity, Update, User, PhotoSize
 from telegram.constants import ChatType
 from telegram.ext import CallbackContext
 from telegram.ext import filters as tg_filters
 
 from bot import askers, bot, commands, models
+from bot.file_processor import FileProcessor
 from bot.config import config
 from bot.filters import Filters
 from tests.mocks import FakeApplication, FakeBot, FakeDalle, FakeGPT
@@ -418,6 +421,7 @@ class MessageTest(unittest.IsolatedAsyncioTestCase, Helper):
     async def test_message(self):
         update = self._create_update(11, text="What is your name?")
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "What is your name?")
         self.assertEqual(self.ai.question, "What is your name?")
         self.assertEqual(self.ai.history, [])
@@ -425,16 +429,19 @@ class MessageTest(unittest.IsolatedAsyncioTestCase, Helper):
     async def test_follow_up(self):
         update = self._create_update(11, text="What is your name?")
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.ai.question, "What is your name?")
         self.assertEqual(self.ai.history, [])
 
         update = self._create_update(12, text="+ And why is that?")
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.ai.question, "And why is that?")
         self.assertEqual(self.ai.history, [("What is your name?", "What is your name?")])
 
         update = self._create_update(13, text="+ Where are you?")
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.ai.question, "Where are you?")
         self.assertEqual(
             self.ai.history,
@@ -447,19 +454,50 @@ class MessageTest(unittest.IsolatedAsyncioTestCase, Helper):
     async def test_forward(self):
         update = self._create_update(11, text="What is your name?", forward_date=dt.datetime.now())
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertTrue(self.bot.text.startswith("This is a forwarded message"))
 
     async def test_document(self):
         update = self._create_update(11, text="I have so much to say" + "." * 5000)
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "I have so much to... (see attachment for the rest): 11.md")
 
     async def test_exception(self):
         askers.TextAsker.model_factory = lambda name: FakeGPT(error=Exception("connection timeout"))
         update = self._create_update(11, text="What is your name?")
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertTrue(self.bot.text.startswith("⚠️ builtins.Exception:"))
         self.assertTrue("connection timeout" in self.bot.text)
+
+
+class MessageMediaGroupTest(unittest.IsolatedAsyncioTestCase, Helper):
+    def setUp(self):
+        askers.TextAsker.model_factory = lambda name: FakeGPT()
+        self.bot = FakeBot("bot")
+        self.chat = Chat(id=1, type=ChatType.PRIVATE)
+        self.chat.set_bot(self.bot)
+        self.application = FakeApplication(self.bot)
+        self.context = CallbackContext(self.application, chat_id=1, user_id=1)
+        self.user = User(id=1, first_name="Alice", is_bot=False, username="alice")
+        self.command = commands.Message(bot.reply_to)
+        config.telegram.usernames = ["alice"]
+        patcher = patch.object(FileProcessor, "process_files", AsyncMock(return_value="files"))
+        self.process_mock = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    async def test_album(self):
+        photo1 = PhotoSize(file_id="p1", file_unique_id="pu1", width=10, height=10, file_size=10)
+        photo2 = PhotoSize(file_id="p2", file_unique_id="pu2", width=10, height=10, file_size=10)
+        update1 = self._create_update(11, caption="Look", photo=[photo1], media_group_id="g")
+        update2 = self._create_update(12, photo=[photo2], media_group_id="g")
+        await self.command(update1, self.context)
+        await self.command(update2, self.context)
+        await asyncio.sleep(1.1)
+        self.process_mock.assert_awaited_once()
+        args, kwargs = self.process_mock.call_args
+        self.assertEqual(len(kwargs["photos"]), 2)
 
 
 class MessageGroupTest(unittest.IsolatedAsyncioTestCase, Helper):
@@ -482,11 +520,13 @@ class MessageGroupTest(unittest.IsolatedAsyncioTestCase, Helper):
         mention = MessageEntity(type=MessageEntity.MENTION, offset=0, length=4)
         update = self._create_update(11, text="@bot What is your name?", entities=(mention,))
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "What is your name?")
 
     async def test_no_mention(self):
         update = self._create_update(11, text="What is your name?")
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "")
 
 
@@ -510,10 +550,12 @@ class MessageLimitTest(unittest.IsolatedAsyncioTestCase, Helper):
     async def test_known_user(self):
         update = self._create_update(11, text="What is your name?")
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "What is your name?")
 
         update = self._create_update(12, text="Where are you from?")
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "Where are you from?")
 
     async def test_unknown_user(self):
@@ -521,10 +563,12 @@ class MessageLimitTest(unittest.IsolatedAsyncioTestCase, Helper):
 
         update = self._create_update(11, text="What is your name?", user=other_user)
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "What is your name?")
 
         update = self._create_update(12, text="Where are you from?", user=other_user)
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertTrue(self.bot.text.startswith("Please wait"))
 
     async def test_expired(self):
@@ -543,6 +587,7 @@ class MessageLimitTest(unittest.IsolatedAsyncioTestCase, Helper):
 
         update = self._create_update(11, text="What is your name?", user=user)
         await self.command(update, context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "What is your name?")
         self.assertEqual(user_data["message_counter"]["value"], 1)
 
@@ -552,10 +597,12 @@ class MessageLimitTest(unittest.IsolatedAsyncioTestCase, Helper):
 
         update = self._create_update(11, text="What is your name?", user=other_user)
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "What is your name?")
 
         update = self._create_update(12, text="Where are you from?", user=other_user)
         await self.command(update, self.context)
+        await asyncio.sleep(1.1)
         self.assertEqual(self.bot.text, "Where are you from?")
 
 
