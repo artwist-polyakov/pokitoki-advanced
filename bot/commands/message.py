@@ -29,6 +29,7 @@ class MessageCommand:
         self.filters = Filters()
         self._buffers: dict[str, list[tuple[Update, Message]]] = {}
         self._tasks: dict[str, asyncio.Task] = {}
+        self._file_prompts: dict[str, asyncio.Task] = {}
         self.debounce_sec = float(os.getenv("DEBOUNCE_WINDOW", "1"))
 
     async def __call__(self, update: Update, context: CallbackContext) -> None:
@@ -187,6 +188,11 @@ class MessageCommand:
                             else [],
                         )
 
+        # Cancel pending "file only" prompts
+        prompt_task = self._file_prompts.pop(key, None)
+        if prompt_task:
+            prompt_task.cancel()
+
         # Обработка файлового контента
         user = UserData(context.user_data)
         if file_content and not question:
@@ -194,10 +200,10 @@ class MessageCommand:
             user.data["last_file_content"] = (
                 f"{prev}\n\n{file_content}" if prev else file_content
             )
-            if not self._buffers.get(key):
-                await message.reply_text(
-                    "This is a file. What should I do with it?"
-                )
+            # defer prompt in case user sends more data
+            self._file_prompts[key] = asyncio.create_task(
+                self._delayed_file_prompt(key, message, context)
+            )
             return
 
         if question and not file_content:
@@ -218,4 +224,18 @@ class MessageCommand:
             question = f"{question}\n\n{file_content}" if question else file_content
 
         await self.reply_func(update=update, message=message, context=context, question=question)
+
+    async def _delayed_file_prompt(
+        self, key: str, message: Message, context: CallbackContext
+    ) -> None:
+        try:
+            await asyncio.sleep(self.debounce_sec)
+        except asyncio.CancelledError:
+            return
+        if self._buffers.get(key) or key in self._tasks:
+            return
+        user = UserData(context.user_data)
+        if user.data.get("last_file_content"):
+            await message.reply_text("This is a file. What should I do with it?")
+        self._file_prompts.pop(key, None)
 
