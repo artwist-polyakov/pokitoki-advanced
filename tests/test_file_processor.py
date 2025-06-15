@@ -86,3 +86,22 @@ class FileProcessorTest(unittest.IsolatedAsyncioTestCase):
         result = await self.processor.process_files([], [photo])
         self.assertEqual(result, "<file_image_pu2>text</file_image_pu2>")
 
+    async def test_multiple_photos(self):
+        photo1 = PhotoSize(
+            file_id="p3",
+            file_unique_id="pu3",
+            width=10,
+            height=10,
+            file_size=10,
+        )
+        photo2 = PhotoSize(
+            file_id="p4",
+            file_unique_id="pu4",
+            width=20,
+            height=20,
+            file_size=20,
+        )
+        result = await self.processor.process_files([], [photo1, photo2])
+        self.assertIn("<file_image_pu3>text</file_image_pu3>", result)
+        self.assertIn("<file_image_pu4>text</file_image_pu4>", result)
+
