@@ -6,6 +6,7 @@ import tempfile
 import textwrap
 import time
 from pathlib import Path
+from typing import Optional
 
 from telegram import Chat, Message, Update
 from telegram.ext import (
@@ -18,7 +19,7 @@ from telegram.ext import (
 )
 from telegram.ext import filters as tg_filters
 
-from bot import askers, commands, models, questions
+from bot import askers, models, questions
 from bot.config import config
 from bot.fetcher import Fetcher
 from bot.filters import Filters
@@ -48,6 +49,38 @@ fetcher = Fetcher()
 filters = Filters()
 
 voice_processor = VoiceProcessor()
+
+
+async def _get_message_content(message: Message) -> Optional[str]:
+    """Extracts text, file and voice content from a message."""
+    content_parts = []
+
+    text = message.text or message.caption
+    if text:
+        content_parts.append(text)
+
+    if (message.document or message.photo) and config.files.enabled:
+        with FileProcessor() as fp:
+            file_content = await fp.process_files(
+                documents=[message.document] if message.document else [],
+                photos=message.photo if message.photo else [],
+            )
+        if file_content:
+            content_parts.append(file_content)
+
+    if message.voice and config.voice.enabled:
+        voice_file = await message.voice.get_file()
+        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp_file:
+            await voice_file.download_to_drive(tmp_file.name)
+            voice_path = Path(tmp_file.name)
+        transcription = await voice_processor.transcribe(voice_path)
+        voice_path.unlink()
+        if transcription:
+            content_parts.append(f"\u0420\u0430\u0441\u0448\u0438\u0444\u0440\u043e\u0432\u043a\u0430 \u0440\u0435\u0447\u0438: {transcription}")
+
+    return "\n".join(content_parts) if content_parts else None
+
+from bot import commands
 
 
 def main():
@@ -203,52 +236,13 @@ async def reply_to(
     )
 
     try:
-        # Process files if present
-        if (message.document or message.photo) and config.files.enabled:
-            if not message.caption:
-                await message.reply_text("This is a file. What should I do with it?")
-                return
-
-            file_processor = FileProcessor()
-            file_content = await file_processor.process_files(
-                documents=[message.document] if message.document else [],
-                photos=message.photo if message.photo else [],
-            )
-
-            if file_content:
-                if not question:
-                    question = message.caption
-                question = f"{question}\n\n{file_content}"
-            else:
-                logger.warning("No content extracted from files")
-
-        # Handle voice messages
-        if message.voice and config.voice.enabled:
-            # Download voice file
-            voice_file = await message.voice.get_file()
-            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp_file:
-                await voice_file.download_to_drive(tmp_file.name)
-                voice_path = Path(tmp_file.name)
-
-            # Transcribe voice to text
-            question = await voice_processor.transcribe(voice_path)
-            voice_path.unlink()  # Clean up
-
-            if not question:
-                await message.reply_text(
-                    "Sorry, I couldn't understand the voice message."
-                )
-                return
-
         chat = ChatData(context.chat_data)
+        user = UserData(context.user_data)
         model_name = chat.model or config.openai.model
         asker = askers.create(model_name, question)
-        if message.chat.type == Chat.PRIVATE and message.forward_date:
-            answer = "This is a forwarded message. What should I do with it?"
-        else:
-            answer = await _ask_question(message, context, question, asker)
 
-        user = UserData(context.user_data)
+        answer = await _ask_question(message, context, question, asker)
+
         user.messages.add(question, answer)
         logger.debug(user.messages)
 
@@ -263,7 +257,7 @@ async def reply_to(
                     with open(speech_file, "rb") as audio:
                         await message.reply_voice(audio)
                 finally:
-                    speech_file.unlink()  # Clean up
+                    speech_file.unlink()
 
     except Exception as exc:
         class_name = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"

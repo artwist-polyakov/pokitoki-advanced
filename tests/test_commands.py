@@ -431,23 +431,26 @@ class MessageTest(unittest.IsolatedAsyncioTestCase, Helper):
         update = self._create_update(12, text="+ And why is that?")
         await self.command(update, self.context)
         self.assertEqual(self.ai.question, "And why is that?")
-        self.assertEqual(self.ai.history, [("What is your name?", "What is your name?")])
+        self.assertEqual(self.ai.history, [])
 
         update = self._create_update(13, text="+ Where are you?")
         await self.command(update, self.context)
         self.assertEqual(self.ai.question, "Where are you?")
-        self.assertEqual(
-            self.ai.history,
-            [
-                ("What is your name?", "What is your name?"),
-                ("+ And why is that?", "And why is that?"),
-            ],
-        )
+        self.assertEqual(self.ai.history, [])
 
     async def test_forward(self):
         update = self._create_update(11, text="What is your name?", forward_date=dt.datetime.now())
         await self.command(update, self.context)
-        self.assertTrue(self.bot.text.startswith("This is a forwarded message"))
+        self.assertEqual(self.bot.text, "")
+
+    async def test_forward_combined(self):
+        update = self._create_update(11, text="File info", forward_date=dt.datetime.now())
+        await self.command(update, self.context)
+        self.assertEqual(self.bot.text, "")
+
+        update = self._create_update(12, text="What is this?")
+        await self.command(update, self.context)
+        self.assertEqual(self.ai.question, "<context>\nFile info\n</context>\n\nWhat is this?")
 
     async def test_document(self):
         update = self._create_update(11, text="I have so much to say" + "." * 5000)
@@ -482,7 +485,7 @@ class MessageGroupTest(unittest.IsolatedAsyncioTestCase, Helper):
         mention = MessageEntity(type=MessageEntity.MENTION, offset=0, length=4)
         update = self._create_update(11, text="@bot What is your name?", entities=(mention,))
         await self.command(update, self.context)
-        self.assertEqual(self.bot.text, "What is your name?")
+        self.assertEqual(self.bot.text, "@bot What is your name?")
 
     async def test_no_mention(self):
         update = self._create_update(11, text="What is your name?")
