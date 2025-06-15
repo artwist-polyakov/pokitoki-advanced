@@ -43,6 +43,29 @@ class UserData:
         period = parse_period(value=1, period=config.conversation.message_limit.period)
         message_count = TimestampedValue(data, name="message_counter", initial=0)
         self.message_counter = ExpiringCounter(message_count, period=period)
+        if "forward_buffer" not in self.data:
+            self.data["forward_buffer"] = []
+        self.forward_buffer: list[dict] = self.data["forward_buffer"]
+
+    def add_to_forward_buffer(self, content: str) -> None:
+        """Adds content to the forward buffer with UTC timestamp."""
+        self.forward_buffer.append(
+            {"content": content, "timestamp": dt.datetime.now(dt.timezone.utc)}
+        )
+
+    def pop_recent_forward_buffer(self, timeout_seconds: int = 5) -> list[str]:
+        """Returns recent buffered items and clears the buffer."""
+        if not self.forward_buffer:
+            return []
+
+        now = dt.datetime.now(dt.timezone.utc)
+        recent = [
+            item["content"]
+            for item in self.forward_buffer
+            if now - item["timestamp"] < dt.timedelta(seconds=timeout_seconds)
+        ]
+        self.forward_buffer.clear()
+        return recent
 
 
 class UserMessage(NamedTuple):
