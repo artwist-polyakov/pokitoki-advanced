@@ -25,6 +25,7 @@ from bot.filters import Filters
 from bot.models import ChatData, UserData
 from bot.voice import VoiceProcessor
 from bot.file_processor import FileProcessor
+from bot.batching import BatchProcessor
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -112,7 +113,7 @@ def add_handlers(application: Application):
             (filters.text_filter | tg_filters.PHOTO | tg_filters.Document.ALL)
             & ~tg_filters.COMMAND
             & filters.users_or_chats,
-            commands.Message(reply_to),
+            commands.Message(batch_processor.add_message),
         )
     )
 
@@ -312,6 +313,10 @@ async def _ask_question(
         f"n_chars={len(answer)}, len_history={len(history)}, took={elapsed}ms"
     )
     return answer
+
+
+# Batch processor instance created after reply function is defined
+batch_processor = BatchProcessor(reply_to)
 
 
 if __name__ == "__main__":
