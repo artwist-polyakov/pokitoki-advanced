@@ -2,7 +2,7 @@
 
 - Website scraping is available via the scrape.do API (1000 free requests per month)
 - Voice message support, with optional TTS output (hear the answer instead of reading)
-- Document support
+- Advanced analysis of documents (PDF, DOCX) and images
 
 
 # Humble GPT Telegram Bot
@@ -151,9 +151,47 @@ The convenience of working with a bot is made up of small details. Here are some
 
 Say you received a message from a colleague or read a post on a channel and want to ask a question. Simply forward the message to the bot and answer the clarifying question it asks.
 
-### Ask with file
+### Analyzing Documents and Images
 
-To ask a question about a document, send it as a file and write the question in the caption. The bot will read the file contents and answer. Currently only supports text content (plain text, code, data), not PDFs, images or audio. Sending multiple files is also not supported.
+The bot can "read" the contents of various documents (PDF, DOCX, TXT...) and analyze images (PNG, JPG...). This unlocks powerful new ways to interact with your data.
+
+You have two convenient ways to work with files:
+
+**1. Files + Question**
+
+The most common scenario is to send one or more files and immediately follow up with a question about them. Thanks to intelligent message batching, the bot will understand that the messages are related.
+
+> 🧑 *[sends report-q1.pdf and sales-q1.xlsx]*
+>
+> 🧑 Compare the Q1 sales with the forecast in the report. What are the main discrepancies?
+>
+> 🤖 After analyzing both documents, I found that actual sales exceeded the forecast by 15%...
+
+**2. File-Only Analysis**
+
+If you just want a general summary of a document or a description of an image, simply send the file without any additional text. The bot will automatically analyze it and provide a result.
+
+> 🧑 *[sends an image containing a chart]*
+>
+> 🤖 This image displays a line chart showing revenue growth for "ABC Corp" from 2020 to 2024. There is a steady annual growth of about 20%, with the exception of a slight dip in 2022...
+
+This flexibility allows you to use the bot as a powerful tool for on-the-fly information analysis.
+
+### Forwarding Messages
+
+You can forward messages from any other chat to the bot for analysis. This is a powerful way to bring external context into your conversation. The process is simple:
+
+1.  Forward one or more messages to the bot. They can contain anything: text, documents, images, or even voice messages.
+2.  Immediately after forwarding, send your question about the forwarded content.
+
+The bot will treat all the forwarded messages and your question as a single, combined query.
+
+> 🧑 *[forwards 3 messages from a work chat: one with text, one with a PDF, and one with an image]*
+>
+> 🧑 Summarize the key points from these messages. What is the deadline mentioned in the document?
+>
+> 🤖 The key point is the upcoming project deadline on Friday. The attached document outlines the final requirements...
+
 
 ### Reply with attachment
 

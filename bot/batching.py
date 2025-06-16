@@ -77,9 +77,9 @@ class BatchMessage:
         self.tasks.append(asyncio.create_task(msg.process()))
         bot_username = context.bot.username
         if (
-            msg.message.reply_to_message
-            and msg.message.reply_to_message.from_user
-            and msg.message.reply_to_message.from_user.username == bot_username
+                msg.message.reply_to_message
+                and msg.message.reply_to_message.from_user
+                and msg.message.reply_to_message.from_user.username == bot_username
         ):
             self.is_follow_up = True
         if msg.message.voice:
@@ -142,10 +142,10 @@ class BatchProcessor:
         self.tokens: Dict[int, int] = {}
 
     async def add_message(
-        self,
-        update: Update,
-        message: Message,
-        context: CallbackContext,
+            self,
+            update: Update,
+            message: Message,
+            context: CallbackContext,
     ) -> None:
         user_id = update.effective_user.id
         batch = self.batches.get(user_id)
@@ -173,27 +173,27 @@ class BatchProcessor:
         batch = self.batches.get(user_id)
         if not batch:
             return
+
         prompt = await batch.get_full_prompt()
-        has_user_text = any(m.has_text for m in batch.messages)
         update = batch.last_update
         context = batch.context
         message = batch.last_message
-        if update and context and message:
-            if not has_user_text:
-                from bot.models import UserData
 
-                user = UserData(context.user_data)
-                if prompt:
-                    user.data["last_file_content"] = prompt
-                await message.reply_text("This is a file. What should I do with it?")
-            else:
-                await self.reply_func(
-                    update=update,
-                    message=message,
-                    context=context,
-                    question=prompt,
-                    send_voice_reply=batch.has_voice,
-                )
+        # If there's no prompt at all (e.g., an empty message or a file that couldn't be read), do nothing.
+        if not prompt.strip():
+            logger.warning("Finalized batch has an empty prompt. Skipping.")
+            return
+
+        if update and context and message:
+            await self.reply_func(
+                update=update,
+                message=message,
+                context=context,
+                question=prompt,
+                send_voice_reply=batch.has_voice,
+            )
+
+        # Cleanup
         timer = self.timers.pop(user_id, None)
         if timer:
             timer.cancel()

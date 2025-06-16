@@ -115,10 +115,10 @@ def add_handlers(application: Application):
     application.add_handler(
         MessageHandler(
             (
-                filters.text_filter
-                | tg_filters.PHOTO
-                | tg_filters.Document.ALL
-                | tg_filters.VOICE
+                    filters.text_filter
+                    | tg_filters.PHOTO
+                    | tg_filters.Document.ALL
+                    | tg_filters.VOICE
             )
             & ~tg_filters.COMMAND
             & filters.users_or_chats,
@@ -156,22 +156,22 @@ def with_message_limit(func):
     """Refuses to reply if the user has exceeded the message limit."""
 
     async def wrapper(
-        update: Update,
-        message: Message,
-        context: CallbackContext,
-        question: str,
-        **kwargs,
+            update: Update,
+            message: Message,
+            context: CallbackContext,
+            question: str,
+            **kwargs,
     ) -> None:
         username = update.effective_user.username
         user = UserData(context.user_data)
 
         # check if the message counter exceeds the message limit
         if (
-            not filters.is_known_user(username)
-            and user.message_counter.value
-            >= config.conversation.message_limit.count
-            > 0
-            and not user.message_counter.is_expired()
+                not filters.is_known_user(username)
+                and user.message_counter.value
+                >= config.conversation.message_limit.count
+                > 0
+                and not user.message_counter.is_expired()
         ):
             # this is a group user and they have exceeded the message limit
             wait_for = models.format_timedelta(user.message_counter.expires_after())
@@ -197,13 +197,15 @@ def with_message_limit(func):
     return wrapper
 
 
+# In bot/bot.py
+
 @with_message_limit
 async def reply_to(
-    update: Update,
-    message: Message,
-    context: CallbackContext,
-    question: str,
-    send_voice_reply: bool = False,
+        update: Update,
+        message: Message,
+        context: CallbackContext,
+        question: str,
+        send_voice_reply: bool = False,
 ) -> None:
     """Replies to a prepared question."""
     logger.info(
@@ -231,10 +233,10 @@ async def reply_to(
         prepared_question, is_follow_up = questions.prepare(question)
         prepared_question = await fetcher.substitute_urls(prepared_question)
 
+        # The logic for `last_file_content` has been removed.
+        # The batcher now handles combining files and text.
         user = UserData(context.user_data)
-        file_content = user.data.pop("last_file_content", None)
-        if file_content:
-            prepared_question = f"{file_content}\n\n{prepared_question}"
+
         if message.chat.type == Chat.PRIVATE:
             if is_follow_up:
                 history = user.messages.as_list()
@@ -284,7 +286,6 @@ async def reply_to(
 batch_processor = BatchProcessor(
     reply_to, buffer_time=config.conversation.batching_buffer_time
 )
-
 
 if __name__ == "__main__":
     main()
