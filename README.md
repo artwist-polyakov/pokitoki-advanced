@@ -197,10 +197,6 @@ The bot will treat all the forwarded messages and your question as a single, com
 
 Sometimes the AI's reply exceeds the maximum message length set by Telegram. In this case, the bot will not fail or spam you with messages. Instead, it will send the answer as an attached markdown file.
 
-### Edited question
-
-To rephrase or add to the last question, edit it (`↑` shortcut). The bot will notice this and respond to the clarified question.
-
 ## Bot information
 
 Use the `/version` command to print detailed information about the current chat, bot, and AI model:
