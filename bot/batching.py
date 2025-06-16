@@ -60,9 +60,17 @@ class BatchMessage:
     def is_ready(self) -> bool:
         return all(t.done() for t in self.tasks)
 
+    async def wait_until_ready(self) -> None:
+        """Waits until all processing tasks are finished."""
+        while True:
+            pending = [t for t in self.tasks if not t.done()]
+            if not pending:
+                break
+            await asyncio.gather(*pending, return_exceptions=True)
+
     async def get_full_prompt(self) -> str:
         if self.tasks:
-            await asyncio.gather(*self.tasks)
+            await self.wait_until_ready()
         parts = [m.content for m in self.messages if m.content]
         return "\n\n".join(parts)
 
@@ -81,6 +89,7 @@ class BatchProcessor:
         self.buffer_time = buffer_time
         self.batches: Dict[int, BatchMessage] = {}
         self.timers: Dict[int, asyncio.TimerHandle] = {}
+        self.tokens: Dict[int, int] = {}
 
     async def add_message(
         self,
@@ -100,13 +109,18 @@ class BatchProcessor:
 
         if user_id in self.timers:
             self.timers[user_id].cancel()
+        token = self.tokens.get(user_id, 0) + 1
+        self.tokens[user_id] = token
         loop = asyncio.get_running_loop()
         self.timers[user_id] = loop.call_later(
             self.buffer_time,
-            lambda: asyncio.create_task(self._finalize_batch(user_id)),
+            lambda tok=token: asyncio.create_task(self._finalize_batch(user_id, tok)),
         )
 
-    async def _finalize_batch(self, user_id: int) -> None:
+    async def _finalize_batch(self, user_id: int, token: int) -> None:
+        if self.tokens.get(user_id) != token:
+            # A newer batch timer exists, so skip finalizing
+            return
         batch = self.batches.get(user_id)
         if not batch:
             return
@@ -134,3 +148,4 @@ class BatchProcessor:
         if timer:
             timer.cancel()
         self.batches.pop(user_id, None)
+        self.tokens.pop(user_id, None)
