@@ -156,7 +156,11 @@ def with_message_limit(func):
     """Refuses to reply if the user has exceeded the message limit."""
 
     async def wrapper(
-        update: Update, message: Message, context: CallbackContext, question: str
+        update: Update,
+        message: Message,
+        context: CallbackContext,
+        question: str,
+        **kwargs,
     ) -> None:
         username = update.effective_user.username
         user = UserData(context.user_data)
@@ -178,7 +182,13 @@ def with_message_limit(func):
 
         # this is a known user or they have not exceeded the message limit,
         # so proceed to the actual message handler
-        await func(update=update, message=message, context=context, question=question)
+        await func(
+            update=update,
+            message=message,
+            context=context,
+            question=question,
+            **kwargs,
+        )
 
         # increment the message counter
         message_count = user.message_counter.increment()
