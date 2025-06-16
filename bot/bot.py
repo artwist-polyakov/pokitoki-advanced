@@ -107,13 +107,20 @@ def add_handlers(application: Application):
         )
     )
 
+    async def message_handler(update: Update, context: CallbackContext) -> None:
+        await batch_processor.add_message(
+            update=update,
+            message=update.message or update.edited_message,
+            context=context,
+        )
+
     # text message handler
     application.add_handler(
         MessageHandler(
             (filters.text_filter | tg_filters.PHOTO | tg_filters.Document.ALL)
             & ~tg_filters.COMMAND
             & filters.users_or_chats,
-            commands.Message(batch_processor.add_message),
+            message_handler,
         )
     )
 
@@ -190,73 +197,61 @@ def with_message_limit(func):
 async def reply_to(
     update: Update, message: Message, context: CallbackContext, question: str
 ) -> None:
-    """Replies to a specific question."""
+    """Replies to a prepared question."""
     logger.info(
-        f"Message received: "
-        f"from={update.effective_user.username}, "
-        f"text={bool(message.text)}, "
-        f"has_voice={bool(message.voice)}, "
-        f"has_files={bool(message.document or message.photo)}"
+        f"Reply_to called for user={update.effective_user.username} with prepared prompt."
     )
+
+    if not question:
+        logger.warning("Prompt is empty, skipping reply.")
+        return
 
     await message.chat.send_action(
         action="typing", message_thread_id=message.message_thread_id
     )
 
     try:
-        # Process files if present
-        if (message.document or message.photo) and config.files.enabled:
-            if not message.caption:
-                await message.reply_text("This is a file. What should I do with it?")
-                return
-
-            file_processor = FileProcessor()
-            file_content = await file_processor.process_files(
-                documents=[message.document] if message.document else [],
-                photos=message.photo if message.photo else [],
-            )
-
-            if file_content:
-                if not question:
-                    question = message.caption
-                question = f"{question}\n\n{file_content}"
-            else:
-                logger.warning("No content extracted from files")
-
-        # Handle voice messages
-        if message.voice and config.voice.enabled:
-            # Download voice file
-            voice_file = await message.voice.get_file()
-            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp_file:
-                await voice_file.download_to_drive(tmp_file.name)
-                voice_path = Path(tmp_file.name)
-
-            # Transcribe voice to text
-            question = await voice_processor.transcribe(voice_path)
-            voice_path.unlink()  # Clean up
-
-            if not question:
-                await message.reply_text(
-                    "Sorry, I couldn't understand the voice message."
-                )
-                return
-
         chat = ChatData(context.chat_data)
         model_name = chat.model or config.openai.model
         asker = askers.create(model_name, question)
-        if message.chat.type == Chat.PRIVATE and message.forward_date:
-            answer = "This is a forwarded message. What should I do with it?"
-        else:
-            answer = await _ask_question(message, context, question, asker)
+
+        user_id = message.from_user.username or message.from_user.id
+        logger.info(
+            f"-> question id={message.id}, user={user_id}, n_chars={len(question)}"
+        )
+
+        prepared_question, is_follow_up = questions.prepare(question)
+        prepared_question = await fetcher.substitute_urls(prepared_question)
 
         user = UserData(context.user_data)
-        user.messages.add(question, answer)
-        logger.debug(user.messages)
+        if message.chat.type == Chat.PRIVATE:
+            if is_follow_up:
+                history = user.messages.as_list()
+            else:
+                user.messages.clear()
+                history = []
+        else:
+            prev_message = questions.extract_prev(message, context)
+            history = [("", prev_message)] if prev_message else []
 
-        # Send text response
+        if message.chat.type == Chat.PRIVATE and message.forward_date:
+            answer = "This is a forwarded message. What should I do with it?"
+            elapsed = 0
+        else:
+            start = time.perf_counter_ns()
+            answer = await asker.ask(
+                prompt=chat.prompt, question=prepared_question, history=history
+            )
+            elapsed = int((time.perf_counter_ns() - start) / 1e6)
+
+        logger.info(
+            f"<- answer id={message.id}, user={user_id}, "
+            f"n_chars={len(answer)}, len_history={len(history)}, took={elapsed}ms"
+        )
+
+        user.messages.add(question, answer)
         await asker.reply(message, context, answer)
 
-        # Send voice response if enabled
         if message.voice and config.voice.tts_enabled:
             speech_file = await voice_processor.text_to_speech(answer)
             if speech_file:
@@ -264,7 +259,7 @@ async def reply_to(
                     with open(speech_file, "rb") as audio:
                         await message.reply_voice(audio)
                 finally:
-                    speech_file.unlink()  # Clean up
+                    speech_file.unlink()
 
     except Exception as exc:
         class_name = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
@@ -272,47 +267,6 @@ async def reply_to(
         logger.error("Failed to answer: %s", error_text)
         text = textwrap.shorten(f"⚠️ {error_text}", width=255, placeholder="...")
         await message.reply_text(text)
-
-
-async def _ask_question(
-    message: Message, context: CallbackContext, question: str, asker: askers.Asker
-) -> str:
-    """Answers a question using the OpenAI model."""
-    user_id = message.from_user.username or message.from_user.id
-    logger.info(f"-> question id={message.id}, user={user_id}, n_chars={len(question)}")
-
-    question, is_follow_up = questions.prepare(question)
-    question = await fetcher.substitute_urls(question)
-    logger.debug(f"Prepared question: {question}")
-
-    user = UserData(context.user_data)
-    if message.chat.type == Chat.PRIVATE:
-        # in private chats the bot remembers previous messages
-        if is_follow_up:
-            # this is a follow-up question,
-            # so the bot should retain the previous history
-            history = user.messages.as_list()
-        else:
-            # user is asking a question 'from scratch',
-            # so the bot should forget the previous history
-            user.messages.clear()
-            history = []
-    else:
-        # in group chats the bot only answers direct questions
-        # or follow-up questions to the bot messages
-        prev_message = questions.extract_prev(message, context)
-        history = [("", prev_message)] if prev_message else []
-
-    chat = ChatData(context.chat_data)
-    start = time.perf_counter_ns()
-    answer = await asker.ask(prompt=chat.prompt, question=question, history=history)
-    elapsed = int((time.perf_counter_ns() - start) / 1e6)
-
-    logger.info(
-        f"<- answer id={message.id}, user={user_id}, "
-        f"n_chars={len(answer)}, len_history={len(history)}, took={elapsed}ms"
-    )
-    return answer
 
 
 # Batch processor instance created after reply function is defined
