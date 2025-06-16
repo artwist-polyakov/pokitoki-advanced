@@ -65,6 +65,8 @@ conversation:
     message_limit:
         count: 0
         period: hour
+    # Time window in seconds to collect messages into a single batch
+    batching_buffer_time: 1.0
 
 # Image generation settings.
 imagine:
