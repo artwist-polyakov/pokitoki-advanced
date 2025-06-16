@@ -83,12 +83,22 @@ class RateLimit:
 class Conversation:
     depth: int
     message_limit: RateLimit
+    batching_buffer_time: float
 
     default_depth = 3
+    default_buffer_time = 1.5
 
-    def __init__(self, depth: int, message_limit: dict) -> None:
+    def __init__(
+        self,
+        depth: int,
+        message_limit: dict,
+        batching_buffer_time: float = default_buffer_time,
+    ) -> None:
         self.depth = depth or self.default_depth
         self.message_limit = RateLimit(**message_limit)
+        self.batching_buffer_time = (
+            batching_buffer_time or self.default_buffer_time
+        )
 
 
 @dataclass
@@ -201,6 +211,9 @@ class Config:
         self.conversation = Conversation(
             depth=src["conversation"].get("depth"),
             message_limit=src["conversation"].get("message_limit") or {},
+            batching_buffer_time=src["conversation"].get(
+                "batching_buffer_time", 1.5
+            ),
         )
 
         # Image generation settings.

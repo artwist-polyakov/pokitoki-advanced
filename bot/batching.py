@@ -17,33 +17,30 @@ voice_processor = VoiceProcessor()
 class IncomingMessage:
     """Base class for a single incoming Telegram message."""
 
-    def __init__(self, message: Message, text: str | None = None) -> None:
+    def __init__(self, message: Message) -> None:
         self.message = message
-        self.text = text
         self.content: str = ""
-        self.has_text = bool(text or message.text or message.caption)
+        self.has_text = bool(message.text or message.caption)
 
     async def process(self) -> None:
         raise NotImplementedError
 
 
 class MarkItDownMessage(IncomingMessage):
-    """Processes text, documents and images using FileProcessor."""
+    """Processes documents, images and voice messages."""
 
     async def process(self) -> None:
-        text = (
-            self.text if self.text is not None else (self.message.text or self.message.caption or "")
-        )
+        content_parts = []
 
-        file_content: Optional[str] = None
         if self.message.document or self.message.photo:
             with FileProcessor() as file_processor:
                 file_content = await file_processor.process_files(
                     documents=[self.message.document] if self.message.document else [],
                     photos=self.message.photo if self.message.photo else [],
                 )
+                if file_content:
+                    content_parts.append(file_content)
 
-        voice_content: Optional[str] = None
         if self.message.voice:
             voice_file = await self.message.voice.get_file()
             with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp_file:
@@ -51,15 +48,10 @@ class MarkItDownMessage(IncomingMessage):
                 voice_path = Path(tmp_file.name)
             voice_content = await voice_processor.transcribe(voice_path)
             voice_path.unlink()
+            if voice_content:
+                content_parts.append(voice_content)
 
-        parts = []
-        if text:
-            parts.append(text)
-        if file_content:
-            parts.append(file_content)
-        if voice_content:
-            parts.append(voice_content)
-        self.content = "\n\n".join(parts)
+        self.content = "\n\n".join(content_parts)
 
 
 class BatchMessage:
@@ -71,6 +63,7 @@ class BatchMessage:
         self.last_update: Optional[Update] = None
         self.context: Optional[CallbackContext] = None
         self.has_voice: bool = False
+        self.caption: Optional[str] = None
 
     def add(self, msg: IncomingMessage, update: Update, context: CallbackContext) -> None:
         self.messages.append(msg)
@@ -79,6 +72,16 @@ class BatchMessage:
         self.tasks.append(asyncio.create_task(msg.process()))
         if msg.message.voice:
             self.has_voice = True
+        if msg.message.caption:
+            if self.caption:
+                self.caption = f"{self.caption}\n{msg.message.caption}"
+            else:
+                self.caption = msg.message.caption
+        elif msg.message.text:
+            if self.caption:
+                self.caption = f"{self.caption}\n{msg.message.text}"
+            else:
+                self.caption = msg.message.text
 
     def is_ready(self) -> bool:
         return all(t.done() for t in self.tasks)
@@ -94,8 +97,17 @@ class BatchMessage:
     async def get_full_prompt(self) -> str:
         if self.tasks:
             await self.wait_until_ready()
-        parts = [m.content for m in self.messages if m.content]
-        return "\n\n".join(parts)
+
+        content_parts = [m.content for m in self.messages if m.content]
+        full_content = "\n\n".join(content_parts)
+
+        final_parts = []
+        if self.caption:
+            final_parts.append(self.caption)
+        if full_content:
+            final_parts.append(full_content)
+
+        return "\n\n".join(final_parts)
 
     @property
     def last_message(self) -> Optional[Message]:
@@ -119,7 +131,6 @@ class BatchProcessor:
         update: Update,
         message: Message,
         context: CallbackContext,
-        question: str | None = None,
     ) -> None:
         user_id = update.effective_user.id
         batch = self.batches.get(user_id)
@@ -127,7 +138,7 @@ class BatchProcessor:
             batch = BatchMessage()
             self.batches[user_id] = batch
 
-        incoming = MarkItDownMessage(message, text=question)
+        incoming = MarkItDownMessage(message)
         batch.add(incoming, update, context)
 
         if user_id in self.timers:

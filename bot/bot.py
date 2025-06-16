@@ -278,7 +278,9 @@ async def reply_to(
 
 
 # Batch processor instance created after reply function is defined
-batch_processor = BatchProcessor(reply_to)
+batch_processor = BatchProcessor(
+    reply_to, buffer_time=config.conversation.batching_buffer_time
+)
 
 
 if __name__ == "__main__":
