@@ -447,7 +447,9 @@ class MessageTest(unittest.IsolatedAsyncioTestCase, Helper):
     async def test_forward(self):
         update = self._create_update(11, text="What is your name?", forward_date=dt.datetime.now())
         await self.command(update, self.context)
-        self.assertTrue(self.bot.text.startswith("This is a forwarded message"))
+        self.assertEqual(self.bot.text, "What is your name?")
+        self.assertEqual(self.ai.question, "What is your name?")
+        self.assertEqual(self.ai.history, [])
 
     async def test_document(self):
         update = self._create_update(11, text="I have so much to say" + "." * 5000)
