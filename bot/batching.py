@@ -1,12 +1,17 @@
 # Batch processing of incoming Telegram messages
 
 import asyncio
+import tempfile
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from telegram import Message, Update
 from telegram.ext import CallbackContext
 
 from bot.file_processor import FileProcessor
+from bot.voice import VoiceProcessor
+
+voice_processor = VoiceProcessor()
 
 
 class IncomingMessage:
@@ -26,20 +31,35 @@ class MarkItDownMessage(IncomingMessage):
     """Processes text, documents and images using FileProcessor."""
 
     async def process(self) -> None:
-        text = self.text if self.text is not None else (self.message.text or self.message.caption or "")
+        text = (
+            self.text if self.text is not None else (self.message.text or self.message.caption or "")
+        )
+
         file_content: Optional[str] = None
-        if (self.message.document or self.message.photo):
+        if self.message.document or self.message.photo:
             with FileProcessor() as file_processor:
                 file_content = await file_processor.process_files(
                     documents=[self.message.document] if self.message.document else [],
                     photos=self.message.photo if self.message.photo else [],
                 )
+
+        voice_content: Optional[str] = None
+        if self.message.voice:
+            voice_file = await self.message.voice.get_file()
+            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp_file:
+                await voice_file.download_to_drive(tmp_file.name)
+                voice_path = Path(tmp_file.name)
+            voice_content = await voice_processor.transcribe(voice_path)
+            voice_path.unlink()
+
+        parts = []
+        if text:
+            parts.append(text)
         if file_content:
-            if text:
-                text = f"{text}\n\n{file_content}"
-            else:
-                text = file_content
-        self.content = text
+            parts.append(file_content)
+        if voice_content:
+            parts.append(voice_content)
+        self.content = "\n\n".join(parts)
 
 
 class BatchMessage:
@@ -50,12 +70,15 @@ class BatchMessage:
         self.tasks: List[asyncio.Task] = []
         self.last_update: Optional[Update] = None
         self.context: Optional[CallbackContext] = None
+        self.has_voice: bool = False
 
     def add(self, msg: IncomingMessage, update: Update, context: CallbackContext) -> None:
         self.messages.append(msg)
         self.last_update = update
         self.context = context
         self.tasks.append(asyncio.create_task(msg.process()))
+        if msg.message.voice:
+            self.has_voice = True
 
     def is_ready(self) -> bool:
         return all(t.done() for t in self.tasks)
@@ -143,6 +166,7 @@ class BatchProcessor:
                     message=message,
                     context=context,
                     question=prompt,
+                    send_voice_reply=batch.has_voice,
                 )
         timer = self.timers.pop(user_id, None)
         if timer:

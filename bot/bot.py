@@ -2,10 +2,8 @@
 
 import logging
 import sys
-import tempfile
 import textwrap
 import time
-from pathlib import Path
 
 from telegram import Chat, Message, Update
 from telegram.ext import (
@@ -24,7 +22,6 @@ from bot.fetcher import Fetcher
 from bot.filters import Filters
 from bot.models import ChatData, UserData
 from bot.voice import VoiceProcessor
-from bot.file_processor import FileProcessor
 from bot.batching import BatchProcessor
 
 logging.basicConfig(
@@ -117,18 +114,15 @@ def add_handlers(application: Application):
     # text message handler
     application.add_handler(
         MessageHandler(
-            (filters.text_filter | tg_filters.PHOTO | tg_filters.Document.ALL)
+            (
+                filters.text_filter
+                | tg_filters.PHOTO
+                | tg_filters.Document.ALL
+                | tg_filters.VOICE
+            )
             & ~tg_filters.COMMAND
             & filters.users_or_chats,
             message_handler,
-        )
-    )
-
-    # voice message handler
-    application.add_handler(
-        MessageHandler(
-            tg_filters.VOICE & filters.users_or_chats,
-            commands.VoiceMessage(reply_to),
         )
     )
 
@@ -195,7 +189,11 @@ def with_message_limit(func):
 
 @with_message_limit
 async def reply_to(
-    update: Update, message: Message, context: CallbackContext, question: str
+    update: Update,
+    message: Message,
+    context: CallbackContext,
+    question: str,
+    send_voice_reply: bool = False,
 ) -> None:
     """Replies to a prepared question."""
     logger.info(
@@ -252,7 +250,7 @@ async def reply_to(
         user.messages.add(question, answer)
         await asker.reply(message, context, answer)
 
-        if message.voice and config.voice.tts_enabled:
+        if send_voice_reply and config.voice.tts_enabled:
             speech_file = await voice_processor.text_to_speech(answer)
             if speech_file:
                 try:

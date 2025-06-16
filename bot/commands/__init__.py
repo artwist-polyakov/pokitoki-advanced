@@ -9,4 +9,3 @@ from .model import ModelCommand as Model  # noqa: F401
 from .retry import RetryCommand as Retry  # noqa: F401
 from .start import StartCommand as Start  # noqa: F401
 from .version import VersionCommand as Version  # noqa: F401
-from .voice import VoiceMessage  # noqa: F401
