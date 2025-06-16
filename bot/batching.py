@@ -12,6 +12,7 @@ from bot.file_processor import FileProcessor
 from bot.voice import VoiceProcessor
 
 voice_processor = VoiceProcessor()
+file_processor = FileProcessor()
 
 
 class IncomingMessage:
@@ -20,7 +21,7 @@ class IncomingMessage:
     def __init__(self, message: Message) -> None:
         self.message = message
         self.content: str = ""
-        self.has_text = bool(message.text or message.caption)
+        self.has_text = bool(message.text or message.caption or message.voice)
 
     async def process(self) -> None:
         raise NotImplementedError
@@ -29,17 +30,20 @@ class IncomingMessage:
 class MarkItDownMessage(IncomingMessage):
     """Processes documents, images and voice messages."""
 
+    def __init__(self, message: Message, file_proc: FileProcessor) -> None:
+        super().__init__(message)
+        self.file_processor = file_proc
+
     async def process(self) -> None:
         content_parts = []
 
         if self.message.document or self.message.photo:
-            with FileProcessor() as file_processor:
-                file_content = await file_processor.process_files(
-                    documents=[self.message.document] if self.message.document else [],
-                    photos=self.message.photo if self.message.photo else [],
-                )
-                if file_content:
-                    content_parts.append(file_content)
+            file_content = await self.file_processor.process_files(
+                documents=[self.message.document] if self.message.document else [],
+                photos=self.message.photo if self.message.photo else [],
+            )
+            if file_content:
+                content_parts.append(file_content)
 
         if self.message.voice:
             voice_file = await self.message.voice.get_file()
@@ -138,7 +142,7 @@ class BatchProcessor:
             batch = BatchMessage()
             self.batches[user_id] = batch
 
-        incoming = MarkItDownMessage(message)
+        incoming = MarkItDownMessage(message, file_proc=file_processor)
         batch.add(incoming, update, context)
 
         if user_id in self.timers:
