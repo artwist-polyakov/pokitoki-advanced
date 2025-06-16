@@ -12,9 +12,11 @@ from bot.file_processor import FileProcessor
 class IncomingMessage:
     """Base class for a single incoming Telegram message."""
 
-    def __init__(self, message: Message) -> None:
+    def __init__(self, message: Message, text: str | None = None) -> None:
         self.message = message
+        self.text = text
         self.content: str = ""
+        self.has_text = bool(text or message.text or message.caption)
 
     async def process(self) -> None:
         raise NotImplementedError
@@ -24,7 +26,7 @@ class MarkItDownMessage(IncomingMessage):
     """Processes text, documents and images using FileProcessor."""
 
     async def process(self) -> None:
-        text = self.message.text or self.message.caption or ""
+        text = self.text if self.text is not None else (self.message.text or self.message.caption or "")
         file_content: Optional[str] = None
         if (self.message.document or self.message.photo):
             with FileProcessor() as file_processor:
@@ -80,14 +82,20 @@ class BatchProcessor:
         self.batches: Dict[int, BatchMessage] = {}
         self.timers: Dict[int, asyncio.TimerHandle] = {}
 
-    async def add_message(self, update: Update, message: Message, context: CallbackContext, question: str | None = None) -> None:
+    async def add_message(
+        self,
+        update: Update,
+        message: Message,
+        context: CallbackContext,
+        question: str | None = None,
+    ) -> None:
         user_id = update.effective_user.id
         batch = self.batches.get(user_id)
         if not batch:
             batch = BatchMessage()
             self.batches[user_id] = batch
 
-        incoming = MarkItDownMessage(message)
+        incoming = MarkItDownMessage(message, text=question)
         batch.add(incoming, update, context)
 
         if user_id in self.timers:
@@ -103,11 +111,25 @@ class BatchProcessor:
         if not batch:
             return
         prompt = await batch.get_full_prompt()
+        has_user_text = any(m.has_text for m in batch.messages)
         update = batch.last_update
         context = batch.context
         message = batch.last_message
         if update and context and message:
-            await self.reply_func(update=update, message=message, context=context, question=prompt)
+            if not has_user_text:
+                from bot.models import UserData
+
+                user = UserData(context.user_data)
+                if prompt:
+                    user.data["last_file_content"] = prompt
+                await message.reply_text("This is a file. What should I do with it?")
+            else:
+                await self.reply_func(
+                    update=update,
+                    message=message,
+                    context=context,
+                    question=prompt,
+                )
         timer = self.timers.pop(user_id, None)
         if timer:
             timer.cancel()

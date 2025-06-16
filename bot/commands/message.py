@@ -56,18 +56,8 @@ class MessageCommand:
                 logger.info("Ignoring voice message in group chat - not a reply to bot")
                 return
 
-        # Обработка файлов
+        # File attachments are processed later by the batch processor
         file_content = None
-        if (message.document or message.photo) and config.files.enabled:
-            if is_group and not is_reply_to_bot:
-                logger.info("Ignoring file in group chat - not a reply to bot")
-                return
-
-            with FileProcessor() as file_processor:
-                file_content = await file_processor.process_files(
-                    documents=[message.document] if message.document else [],
-                    photos=message.photo if message.photo else [],
-                )
 
         # Получаем текст сообщения
         if message.chat.type == Chat.PRIVATE:
@@ -125,22 +115,12 @@ class MessageCommand:
                             ),
                         )
 
-        # Обработка файлового контента
-        if file_content and not question:
-            user = UserData(context.user_data)
-            user.data["last_file_content"] = file_content
-            await message.reply_text("This is a file. What should I do with it?")
-            return
-
+        # Use file content from previous message if any
         if question and not file_content:
             user = UserData(context.user_data)
             file_content = user.data.pop("last_file_content", None)
             if file_content:
                 question = f"{question}\n\n{file_content}"
-
-        if not file_content and not question:
-            logger.info("No content extracted, ignoring message")
-            return
 
         if file_content:
             question = f"{question}\n\n{file_content}" if question else file_content
