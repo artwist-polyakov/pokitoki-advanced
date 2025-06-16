@@ -68,12 +68,20 @@ class BatchMessage:
         self.context: Optional[CallbackContext] = None
         self.has_voice: bool = False
         self.caption: Optional[str] = None
+        self.is_follow_up: bool = False
 
     def add(self, msg: IncomingMessage, update: Update, context: CallbackContext) -> None:
         self.messages.append(msg)
         self.last_update = update
         self.context = context
         self.tasks.append(asyncio.create_task(msg.process()))
+        bot_username = context.bot.username
+        if (
+            msg.message.reply_to_message
+            and msg.message.reply_to_message.from_user
+            and msg.message.reply_to_message.from_user.username == bot_username
+        ):
+            self.is_follow_up = True
         if msg.message.voice:
             self.has_voice = True
         if msg.message.caption:
@@ -111,7 +119,10 @@ class BatchMessage:
         if full_content:
             final_parts.append(full_content)
 
-        return "\n\n".join(final_parts)
+        full_prompt = "\n\n".join(final_parts)
+        if self.is_follow_up:
+            return f"+ {full_prompt}"
+        return full_prompt
 
     @property
     def last_message(self) -> Optional[Message]:

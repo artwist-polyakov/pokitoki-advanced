@@ -232,6 +232,9 @@ async def reply_to(
         prepared_question = await fetcher.substitute_urls(prepared_question)
 
         user = UserData(context.user_data)
+        file_content = user.data.pop("last_file_content", None)
+        if file_content:
+            prepared_question = f"{file_content}\n\n{prepared_question}"
         if message.chat.type == Chat.PRIVATE:
             if is_follow_up:
                 history = user.messages.as_list()
