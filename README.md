@@ -149,7 +149,7 @@ The convenience of working with a bot is made up of small details. Here are some
 
 ### Forwarding
 
-Say you received a message from a colleague or read a post on a channel and want to ask a question. Simply forward the message to the bot and answer the clarifying question it asks.
+Forward a message from another chat and then send your question. The bot will combine the forwarded text with your question before replying.
 
 ### Analyzing Documents and Images
 

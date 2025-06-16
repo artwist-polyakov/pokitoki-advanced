@@ -247,15 +247,13 @@ async def reply_to(
             prev_message = questions.extract_prev(message, context)
             history = [("", prev_message)] if prev_message else []
 
-        if message.chat.type == Chat.PRIVATE and message.forward_date:
-            answer = "This is a forwarded message. What should I do with it?"
-            elapsed = 0
-        else:
-            start = time.perf_counter_ns()
-            answer = await asker.ask(
-                prompt=chat.prompt, question=prepared_question, history=history
-            )
-            elapsed = int((time.perf_counter_ns() - start) / 1e6)
+        start = time.perf_counter_ns()
+        answer = await asker.ask(
+            prompt=chat.prompt,
+            question=prepared_question,
+            history=history,
+        )
+        elapsed = int((time.perf_counter_ns() - start) / 1e6)
 
         logger.info(
             f"<- answer id={message.id}, user={user_id}, "
