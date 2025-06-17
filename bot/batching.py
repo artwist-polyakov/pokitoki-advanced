@@ -1,18 +1,23 @@
 # Batch processing of incoming Telegram messages
 
 import asyncio
+import logging
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from telegram import Message, Update
+from telegram import Chat, Message, Update
 from telegram.ext import CallbackContext
 
 from bot.file_processor import FileProcessor
 from bot.voice import VoiceProcessor
+from bot.filters import Filters
 
 voice_processor = VoiceProcessor()
 file_processor = FileProcessor()
+filters = Filters()
+
+logger = logging.getLogger(__name__)
 
 
 class IncomingMessage:
@@ -69,6 +74,7 @@ class BatchMessage:
         self.has_voice: bool = False
         self.caption: Optional[str] = None
         self.is_follow_up: bool = False
+        self.addressed: bool = False
 
     def add(self, msg: IncomingMessage, update: Update, context: CallbackContext) -> None:
         self.messages.append(msg)
@@ -76,12 +82,11 @@ class BatchMessage:
         self.context = context
         self.tasks.append(asyncio.create_task(msg.process()))
         bot_username = context.bot.username
-        if (
-                msg.message.reply_to_message
-                and msg.message.reply_to_message.from_user
-                and msg.message.reply_to_message.from_user.username == bot_username
-        ):
+        if filters.is_reply_to_bot(msg.message, bot_username):
             self.is_follow_up = True
+            self.addressed = True
+        if filters.is_bot_mentioned(msg.message, bot_username):
+            self.addressed = True
         if msg.message.voice:
             self.has_voice = True
         if msg.message.caption:
@@ -185,13 +190,16 @@ class BatchProcessor:
             return
 
         if update and context and message:
-            await self.reply_func(
-                update=update,
-                message=message,
-                context=context,
-                question=prompt,
-                send_voice_reply=batch.has_voice,
-            )
+            if message.chat.type != Chat.PRIVATE and not batch.addressed:
+                logger.info("Skipping unaddressed batch in group chat")
+            else:
+                await self.reply_func(
+                    update=update,
+                    message=message,
+                    context=context,
+                    question=prompt,
+                    send_voice_reply=batch.has_voice,
+                )
 
         # Cleanup
         timer = self.timers.pop(user_id, None)
