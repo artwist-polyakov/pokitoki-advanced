@@ -105,9 +105,16 @@ def add_handlers(application: Application):
     )
 
     async def message_handler(update: Update, context: CallbackContext) -> None:
+        message = update.message or update.edited_message
+        if message.chat.type != Chat.PRIVATE:
+            bot_username = context.bot.username
+            is_mentioned = filters.is_bot_mentioned(message, bot_username)
+            is_reply = filters.is_reply_to_bot(message, bot_username)
+            if not (is_mentioned or is_reply) and update.effective_user.id not in batch_processor.batches:
+                return
         await batch_processor.add_message(
             update=update,
-            message=update.message or update.edited_message,
+            message=message,
             context=context,
         )
 
