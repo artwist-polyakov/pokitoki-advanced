@@ -158,4 +158,5 @@ class FileProcessor:
 
     def __del__(self):
         """Cleanup executor on deletion."""
-        self.close()
+        if self.executor:
+            self.close()
