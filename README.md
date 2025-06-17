@@ -147,10 +147,6 @@ Only admins - users listed in the `telegram.admins` property - can change the mo
 
 The convenience of working with a bot is made up of small details. Here are some situations where it can save you time and effort.
 
-### Forwarding
-
-Forward a message from another chat and then send your question. The bot will combine the forwarded text with your question before replying.
-
 ### Analyzing Documents and Images
 
 The bot can "read" the contents of various documents (PDF, DOCX, TXT...) and analyze images (PNG, JPG...). This unlocks powerful new ways to interact with your data.
