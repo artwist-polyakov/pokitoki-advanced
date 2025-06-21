@@ -282,6 +282,9 @@ async def reply_to(
     except Exception as exc:
         class_name = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
         error_text = f"{class_name}: {exc}"
+        token = config.scrapdo.token
+        if token:
+            error_text = error_text.replace(token, "***")
         logger.error("Failed to answer: %s", error_text)
         text = textwrap.shorten(f"⚠️ {error_text}", width=255, placeholder="...")
         await message.reply_text(text)

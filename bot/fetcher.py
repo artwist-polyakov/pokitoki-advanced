@@ -1,6 +1,7 @@
 import json
 import re
 import urllib.parse
+import ipaddress
 
 import aiohttp
 import httpx
@@ -54,8 +55,24 @@ class Fetcher:
         await self.client.aclose()
 
     def _extract_urls(self, text: str) -> list[str]:
-        """Finds all URLs in the text by regex."""
-        return self.url_re.findall(text)
+        """Finds all URLs in the text by regex and filters local addresses."""
+        urls = self.url_re.findall(text)
+        return [url for url in urls if not self._is_local_url(url)]
+
+    def _is_local_url(self, url: str) -> bool:
+        """Returns True if the URL points to a localhost or private address."""
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname
+        if not host:
+            return True
+        host = host.lower()
+        if host == "localhost":
+            return True
+        try:
+            ip = ipaddress.ip_address(host)
+            return ip.is_private or ip.is_loopback
+        except ValueError:
+            return False
 
     async def _fetch_url(self, url: str) -> str:
         """

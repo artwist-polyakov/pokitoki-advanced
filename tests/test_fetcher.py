@@ -78,6 +78,11 @@ second
         urls = self.fetcher._extract_urls(text)
         self.assertEqual(urls, [])
 
+    def test_ignore_local_urls(self):
+        text = "Check http://localhost:8000/ and http://127.0.0.1/foo"
+        urls = self.fetcher._extract_urls(text)
+        self.assertEqual(urls, [])
+
     async def test_fetch_url(self):
         self.fetcher.client = FakeClient({"https://example.org/boom": RuntimeError("boom")})
         result = await self.fetcher._fetch_url("https://example.org/boom")
