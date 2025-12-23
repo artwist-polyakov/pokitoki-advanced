@@ -1,130 +1,33 @@
-# Bot configuration parameters.
-
-# Config schema version. Increments for backward-incompatible changes.
-schema_version: 3
-
-# Telegram settings.
-telegram:
-    # Telegram Bot API token.
-    token: ""
-
-    # The list of Telegram usernames allowed to chat with the bot.
-    # If empty, the bot will be available to anyone.
-    usernames: []
-
-    # The list of Telegram usernames allowed to change bot settings.
-    # If empty, then no one is allowed to change the settings.
-    admins: []
-
-    # The list of Telegram group ids, whose members are allowed to chat with the bot.
-    # If empty, the bot will only be available to `telegram.usernames`.
-    chat_ids: []
-
-# Scrap.do settings.
-scrapdo:
-    token: ""
-
-# OpenAI settings.
-openai:
-    # OpenAI API key.
-    api_key: ""
-
-    # OpenAI API base URL.
-    url: "https://api.openai.com/v1"
-
-    # OpenAI model name.
-    # See https://platform.openai.com/docs/models for description.
-    # Example: gpt-4o-mini, o4-mini, gpt-4.1
-    model: "gpt-4o-mini"
-
-    # Image generation model name.
-    image_model: "dall-e-3"
-
-    # Context window size in tokens.
-    window: 128000
-
-    # Model prompt.
-    prompt: "You are an AI assistant."
-
-    # Model parameters.
-    # See https://platform.openai.com/docs/api-reference/chat/create for description.
-    params:
-        temperature: 0.7
-        max_tokens: 4096
-
-
 conversation:
-    # The maximum number of previous messages
-    # the bot will remember when talking to a user.
+    batching_buffer_time: 1.0
     depth: 3
-
-    # The maximum number of messages a user can send during the specified time period.
-    # Only applies to users who are not listed in `telegram.usernames`.
-    #   `count`  = an integer number of messages (0 = unlimited)
-    #   `period` = minute | hour | day
     message_limit:
         count: 0
         period: hour
-    # Time window in seconds to collect messages into a single batch
-    batching_buffer_time: 1.0
-
-# Image generation settings.
 imagine:
-    # Enable/disable image generation:
-    #   - none             = disabled for everyone
-    #   - users_only       = enabled only for users listed in `telegram.usernames`
-    #   - users_and_groups = enabled for both users listed in `telegram.usernames`
-    #                        and members of `telegrams.chat_ids`
-    enabled: none
-
-# Where to store the chat context file.
-persistence_path: "./data/persistence.pkl"
-
-# Custom AI commands (additional prompts)
+    enabled: users_only
+openai:
+    api_key: ''
+    image_model: dall-e-3
+    model: gpt-4o-mini
+    params:
+        max_tokens: 4096
+        temperature: 0.7
+    prompt: You are an AI assistant.
+    url: https://api.openai.com/v1
+    window: 128000
+persistence_path: ./data/persistence.pkl
+schema_version: 4
 shortcuts:
-    bugfix: "Examine the following code. Rewrite it if necessary to fix bugs and various problems. Explain the changes you've made."
-
-    proofread: "Proofread the following text. Correct grammar and punctuation errors. Rephrase if necessary. Make sure the resulting text is clear, concise, and easy to read. Explain the changes you've made."
-
-    summarize: "Explain the following text in simple terms. Use no more than two paragraphs."
-
-    translate: "Translate the following text into English."
-
-# Voice message processing settings
-voice:
-    # Enable/disable voice message processing
-    enabled: true
-    # Enable/disable text-to-speech responses
-    tts_enabled: true
-    # OpenAI Whisper model for speech recognition
-    model: "whisper-1"
-    # Default language for speech recognition
-    language: "auto"  # "auto" for automatic language detection, or use specific language code like "ru"
-    # Maximum voice message size in MB
-    max_file_size: 25
-    # OpenAI TTS model settings
-    tts:
-        model: "tts-1"
-        voice: "sage"  # alloy, echo, fable, onyx, nova, sage,or shimmer
-
-# File processing settings
-files:
-    enabled: true
-    # Default prompt for image recognition if not specified
-    image_recognition_prompt: "Describe what you see in the image, including any text present and its meaning. Be detailed but concise."
-    # Maximum file size in MB
-    max_file_size: 25
-    # Supported file extensions
-    supported_extensions:
-        - .pdf
-        - .doc
-        - .docx
-        - .xls
-        - .xlsx
-        - .ppt
-        - .pptx
-        - .txt
-        - .rtf
-        - .jpg
-        - .jpeg
-        - .png
+    bugfix: Examine the following code. Rewrite it if necessary to fix bugs and various
+        problems. Explain the changes you've made.
+    proofread: Proofread the following text. Correct grammar and punctuation errors.
+        Rephrase if necessary. Make sure the resulting text is clear, concise, and
+        easy to read. Explain the changes you've made.
+    summarize: Explain the following text in simple terms. Use no more than two paragraphs.
+    translate: Translate the following text into English.
+telegram:
+    admins: []
+    chat_ids: []
+    token: ''
+    usernames: []
