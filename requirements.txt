@@ -4,6 +4,5 @@ openai==1.84.0
 beautifulsoup4==4.12.2
 python-telegram-bot==20.6
 PyYAML==6.0.2
-tiktoken==0.5.1
 aiohttp==3.11.1
 markitdown==0.0.1a3

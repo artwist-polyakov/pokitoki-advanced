@@ -3,19 +3,20 @@
 import logging
 from typing import Optional
 
-import tiktoken
 from openai import AsyncOpenAI
 
 from bot.config import config
 
 openai = AsyncOpenAI(api_key=config.openai.api_key, base_url=config.openai.url)
 
-encoding = tiktoken.get_encoding("cl100k_base")
 logger = logging.getLogger(__name__)
 
 # Supported models and their context windows
 MODELS = {
     # Gemini
+    "gemini-2.5-pro": 1_048_576,
+    "gemini-2.5-flash": 1_048_576,
+    "gemini-2.5-flash-lite": 1_048_576,
     "gemini-2.0-flash": 1_048_576,
     "gemini-1.5-flash": 1_048_576,
     "gemini-1.5-flash-8b": 1_048_576,
@@ -31,6 +32,10 @@ MODELS = {
     "gpt-4.1": 1_047_576,
     "gpt-4.1-mini": 1_047_576,
     "gpt-4.1-nano": 1_047_576,
+    "gpt-5": 128000,
+    "gpt-5-mini": 128000,
+    "gpt-5-nano": 128000,
+    "gpt-5.1": 128000,
     "gpt-4o": 128000,
     "gpt-4o-mini": 128000,
     "gpt-4-turbo": 128000,
@@ -60,6 +65,10 @@ PARAM_OVERRIDES = {
     "o3-mini": lambda params: {},
     "o4": lambda params: {},
     "o4-mini": lambda params: {},
+    "gpt-5": lambda params: {},
+    "gpt-5-mini": lambda params: {},
+    "gpt-5-nano": lambda params: {},
+    "gpt-5.1": lambda params: {},
 }
 
 
@@ -128,12 +137,17 @@ class Model:
         return answer
 
 
+def _calc_tokens(s: str) -> int:
+    """Calculates the number of tokens in a string."""
+    return int(len(s.split()) * 1.2)
+
+
 def shorten(messages: list[dict], length: int) -> list[dict]:
     """
     Truncates messages so that the total number or tokens
     does not exceed the specified length.
     """
-    lengths = [len(encoding.encode(m["content"])) for m in messages]
+    lengths = [_calc_tokens(m["content"]) for m in messages]
     total_len = sum(lengths)
     if total_len <= length:
         return messages
@@ -153,9 +167,8 @@ def shorten(messages: list[dict], length: int) -> list[dict]:
     # there is only one message left, and it's still longer than allowed
     # so we have to shorten it
     maxlen = length - prompt_len
-    tokens = encoding.encode(messages[1]["content"])
-    tokens = tokens[:maxlen]
-    messages[1]["content"] = encoding.decode(tokens)
+    tokens = messages[1]["content"].split()[:maxlen]
+    messages[1]["content"] = " ".join(tokens)
     return messages
 
 
