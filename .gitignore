@@ -157,3 +157,6 @@ cython_debug/
 # Custom
 config.yml
 *.pkl
+
+.claude
+.DS_Store
