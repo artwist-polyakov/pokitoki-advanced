@@ -102,16 +102,26 @@ class Fetcher:
 
     async def _fetch_via_scrapdo(self, url: str, token: str) -> httpx.Response:
         """Returns a Scrape.do response with the same interface as a direct request."""
-        response = await self.client.get(
-            "https://api.scrape.do",
-            params={"token": token, "url": url},
-            headers={
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
-                "Accept-Encoding": "gzip, deflate",
-            },
-        )
-        response.raise_for_status()
-        return response
+        try:
+            response = await self.client.get(
+                "https://api.scrape.do",
+                params={"token": token, "url": url},
+                headers={
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
+                    "Accept-Encoding": "gzip, deflate",
+                },
+            )
+            response.raise_for_status()
+            return response
+        except HTTPStatusError as exc:
+            # HTTPX includes the token-bearing request URL in its default message.
+            raise HTTPStatusError(
+                f"Scrape.do returned HTTP {exc.response.status_code}",
+                request=exc.request,
+                response=exc.response,
+            ) from None
+        except RequestError as exc:
+            raise type(exc)("Scrape.do request failed", request=exc.request) from None
 
 
 class Content:

@@ -1,4 +1,6 @@
 import unittest
+import traceback
+import urllib.parse
 from unittest.mock import patch
 
 import httpx
@@ -233,6 +235,32 @@ class FetcherFallbackTest(unittest.IsolatedAsyncioTestCase):
                         await self.fetcher._fetch_url("https://example.org")
                 self.assertEqual(len(requests), 2)
                 if isinstance(failure, Exception):
-                    self.assertIs(caught.exception, failure)
+                    self.assertIsInstance(caught.exception, type(failure))
                 else:
                     self.assertIs(caught.exception.response, failure)
+
+
+    async def test_fallback_tracebacks_do_not_expose_token(self):
+        token = "private+token/with=special&characters"
+        for failure in (401, 429, 500, "network"):
+            with self.subTest(failure=failure):
+                def handler(request):
+                    if request.url.host == "example.org":
+                        return Response(403)
+                    if failure == "network":
+                        raise httpx.ConnectError(f"Failed to connect: {request.url}", request=request)
+                    return Response(failure)
+
+                with patch.object(config.scrapdo, "token", token):
+                    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                        self.fetcher.client = client
+                        try:
+                            await self.fetcher._fetch_url("https://example.org")
+                        except (httpx.HTTPStatusError, httpx.RequestError):
+                            rendered = traceback.format_exc()
+                        else:
+                            self.fail("Expected a fallback error")
+                self.assertIn("Scrape.do", rendered)
+                self.assertNotIn(token, rendered)
+                self.assertNotIn(urllib.parse.quote(token, safe=""), rendered)
+                self.assertNotIn("api.scrape.do?", rendered)
