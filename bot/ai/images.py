@@ -15,7 +15,8 @@ class Model:
     async def imagine(self, prompt: str, size: str) -> bytes | str:
         """Generates an image and decodes GPT Image's base64 response."""
         model = config.openai.image_model
-        if model.removeprefix("openai/").startswith("gpt-image-"):
+        model_name = model.removeprefix("openai/")
+        if model_name.startswith("gpt-image-"):
             # Keep old DALL-E dimensions usable across GPT Image models.
             size = {
                 "256x256": "1024x1024",
@@ -23,6 +24,15 @@ class Model:
                 "1792x1024": "1536x1024",
                 "1024x1792": "1024x1536",
             }.get(size, size)
+        elif model_name == "dall-e-3":
+            size = {
+                "256x256": "1024x1024",
+                "512x512": "1024x1024",
+                "1536x1024": "1792x1024",
+                "1024x1536": "1024x1792",
+            }.get(size, size)
+        elif model_name == "dall-e-2" and size not in {"256x256", "512x512", "1024x1024"}:
+            size = "1024x1024"
         resp = await openai.images.generate(model=model, prompt=prompt, size=size, n=1)
         if not resp.data:
             raise ValueError("missing image data")

@@ -226,6 +226,25 @@ class ImageRequestTest(unittest.IsolatedAsyncioTestCase):
                     _, request = await self._generate([image], model=model, size=old)
                     self.assertEqual(request["size"], new)
 
+    async def test_dimensions_follow_explicit_legacy_model(self):
+        image = SimpleNamespace(b64_json=None, url="https://example.org/cat.png")
+        for model in ("dall-e-2", "dall-e-3", "openai/dall-e-3"):
+            cases = {
+                "256x256": "256x256" if model == "dall-e-2" else "1024x1024",
+                "512x512": "512x512" if model == "dall-e-2" else "1024x1024",
+                "1024x1024": "1024x1024",
+                "1536x1024": "1024x1024" if model == "dall-e-2" else "1792x1024",
+                "1024x1536": "1024x1024" if model == "dall-e-2" else "1024x1792",
+                "1792x1024": "1024x1024" if model == "dall-e-2" else "1792x1024",
+                "1024x1792": "1024x1024" if model == "dall-e-2" else "1024x1792",
+            }
+            for size, expected in cases.items():
+                with self.subTest(model=model, size=size):
+                    result, request = await self._generate([image], model=model, size=size)
+                    self.assertEqual(request["model"], model)
+                    self.assertEqual(request["size"], expected)
+                    self.assertEqual(result, image.url)
+
     async def test_provider_url_response_remains_supported(self):
         image = SimpleNamespace(b64_json=None, url="https://example.org/cat.png")
         result, request = await self._generate([image], model="custom-image", size="512x512")

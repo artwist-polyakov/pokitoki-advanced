@@ -182,6 +182,8 @@ The image client supports GPT Image's base64 output and URL output from compatib
 providers. `/imagine` supports `1024x1024`, `1536x1024`, and `1024x1536`;
 legacy `256` and `512` square shortcuts become `1024x1024` for GPT Image,
 and DALL·E dimensions `1792x1024` / `1024x1792` map to `1536x1024` / `1024x1536`.
+If a compatible provider still serves an explicitly configured DALL·E model,
+landscape/portrait sizes map back to DALL·E 3 dimensions; DALL·E 2 uses a square.
 Generated images are sent to Telegram and excluded from text history and speech
 replies, whether the provider returns image bytes or a URL.
 See the [image API guide](https://developers.openai.com/api/docs/guides/image-generation).
