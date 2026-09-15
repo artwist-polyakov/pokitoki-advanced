@@ -131,6 +131,16 @@ class ChatRequestTest(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("top_p", request)
                 self.assertEqual(params, original)
 
+    async def test_legacy_reasoning_models_preserve_request_compatibility(self):
+        for name in ("o1-pro", "o4", "openai/o1-pro-2025-03-19"):
+            with self.subTest(model=name):
+                _, request = await self._ask(name, {"max_tokens": 4096, "temperature": 0.7})
+                self.assertEqual(request["max_completion_tokens"], 4096)
+                self.assertEqual(request["messages"][0]["role"], "user")
+                self.assertNotIn("temperature", request)
+                self.assertNotIn("max_tokens", request)
+                self.assertEqual(chat._calc_n_input(name, 4096), 200000 - 4096)
+
     async def test_non_reasoning_and_unknown_providers_keep_parameters(self):
         for name in ("gpt-4o-mini", "gemini-3.8-flash", "custom-model"):
             with self.subTest(model=name):
@@ -207,6 +217,14 @@ class ImageRequestTest(unittest.IsolatedAsyncioTestCase):
                 expected = "1024x1024" if size in ("256x256", "512x512") else size
                 self.assertEqual(request["size"], expected)
                 self.assertNotIn("response_format", request)
+
+    async def test_legacy_landscape_and_portrait_sizes_for_gpt_image(self):
+        image = SimpleNamespace(b64_json=base64.b64encode(b"image bytes").decode(), url=None)
+        for model in ("gpt-image-1", "gpt-image-2.5-flare", "openai/gpt-image-2.5-flare"):
+            for old, new in (("1792x1024", "1536x1024"), ("1024x1792", "1024x1536")):
+                with self.subTest(model=model, size=old):
+                    _, request = await self._generate([image], model=model, size=old)
+                    self.assertEqual(request["size"], new)
 
     async def test_provider_url_response_remains_supported(self):
         image = SimpleNamespace(b64_json=None, url="https://example.org/cat.png")

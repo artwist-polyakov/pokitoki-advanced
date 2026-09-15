@@ -48,6 +48,12 @@ MODELS = {
     "gpt-4o": 128_000,
     "gpt-4o-mini": 128_000,
     # Legacy entries remain for compatible providers and existing configurations.
+    "o1-pro": 200_000,
+    "o4": 200_000,
+    "gemini-2.0-flash": 1_048_576,
+    "gemini-1.5-flash": 1_048_576,
+    "gemini-1.5-flash-8b": 1_048_576,
+    "gemini-1.5-pro": 2_097_152,
     "gpt-4-turbo": 128_000,
     "gpt-4-turbo-preview": 128_000,
     "gpt-4-vision-preview": 128_000,
@@ -117,7 +123,9 @@ class Model:
         """Asks the language model a question and returns an answer."""
         model = self.name or config.openai.model
         prompt_role = (
-            "user" if _model_name(model) in {"o1", "o1-mini", "o3", "o3-mini", "o4-mini"}
+            "user" if _model_name(model) in {
+                "o1", "o1-pro", "o1-mini", "o3", "o3-mini", "o4", "o4-mini"
+            }
             else "system"
         )
         params = _prepare_params(model, config.openai.params)

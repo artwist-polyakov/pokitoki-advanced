@@ -180,7 +180,8 @@ for the OpenAI SDK.
 [DALL·E 2 and 3 were removed from the OpenAI API on May 12, 2026](https://developers.openai.com/api/docs/deprecations).
 The image client supports GPT Image's base64 output and URL output from compatible
 providers. `/imagine` supports `1024x1024`, `1536x1024`, and `1024x1536`;
-legacy `256` and `512` square shortcuts become `1024x1024` for GPT Image.
+legacy `256` and `512` square shortcuts become `1024x1024` for GPT Image,
+and DALL·E dimensions `1792x1024` / `1024x1792` map to `1536x1024` / `1024x1536`.
 Generated image bytes are sent to Telegram and excluded from text history.
 See the [image API guide](https://developers.openai.com/api/docs/guides/image-generation).
 

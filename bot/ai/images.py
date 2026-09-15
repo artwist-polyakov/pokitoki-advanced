@@ -16,8 +16,13 @@ class Model:
         """Generates an image and decodes GPT Image's base64 response."""
         model = config.openai.image_model
         if model.removeprefix("openai/").startswith("gpt-image-"):
-            # Keep old square-size shortcuts usable with GPT Image.
-            size = {"256x256": "1024x1024", "512x512": "1024x1024"}.get(size, size)
+            # Keep old DALL-E dimensions usable across GPT Image models.
+            size = {
+                "256x256": "1024x1024",
+                "512x512": "1024x1024",
+                "1792x1024": "1536x1024",
+                "1024x1792": "1024x1536",
+            }.get(size, size)
         resp = await openai.images.generate(model=model, prompt=prompt, size=size, n=1)
         if not resp.data:
             raise ValueError("missing image data")
