@@ -1,6 +1,7 @@
-"""ChatGPT (GPT-3.5+) language model from OpenAI."""
+"""Chat Completions client for OpenAI-compatible providers."""
 
 import logging
+import re
 from typing import Optional
 
 from openai import AsyncOpenAI
@@ -11,65 +12,96 @@ openai = AsyncOpenAI(api_key=config.openai.api_key, base_url=config.openai.url)
 
 logger = logging.getLogger(__name__)
 
-# Supported models and their context windows
+# Verified 2026-09-15 against https://developers.openai.com/api/docs/models
+# and https://ai.google.dev/gemini-api/docs/models.
+# OpenAI values are context windows; Gemini values are input limits.
 MODELS = {
-    # Gemini
+    "gemini-3.8-flash": 1_048_576,
+    "gemini-3.5-flash-lite": 1_048_576,
+    "gemini-3.1-flash-lite": 1_048_576,
+    "gemini-3.1-pro-preview": 1_048_576,
     "gemini-2.5-pro": 1_048_576,
     "gemini-2.5-flash": 1_048_576,
     "gemini-2.5-flash-lite": 1_048_576,
-    "gemini-2.0-flash": 1_048_576,
-    "gemini-1.5-flash": 1_048_576,
-    "gemini-1.5-flash-8b": 1_048_576,
-    "gemini-1.5-pro": 2_097_152,
-    # OpenAI
-    "o1": 200000,
-    "o1-pro": 200000,
-    "o1-mini": 128000,
-    "o3": 200000,
-    "o3-mini": 200000,
-    "o4": 200000,
-    "o4-mini": 200000,
+    "gpt-6-astra": 1_050_000,
+    "gpt-5.6": 1_050_000,
+    "gpt-5.6-sol": 1_050_000,
+    "gpt-5.6-terra": 1_050_000,
+    "gpt-5.6-luna": 1_050_000,
+    "gpt-5.5": 1_050_000,
+    "gpt-5.4": 1_050_000,
+    "gpt-5.4-mini": 400_000,
+    "gpt-5.4-nano": 400_000,
+    "gpt-5.2": 400_000,
+    "gpt-5.1": 400_000,
+    "gpt-5": 400_000,
+    "gpt-5-mini": 400_000,
+    "gpt-5-nano": 400_000,
+    "o1": 200_000,
+    "o1-mini": 128_000,
+    "o3": 200_000,
+    "o3-mini": 200_000,
+    "o4-mini": 200_000,
     "gpt-4.1": 1_047_576,
     "gpt-4.1-mini": 1_047_576,
     "gpt-4.1-nano": 1_047_576,
-    "gpt-5": 128000,
-    "gpt-5-mini": 128000,
-    "gpt-5-nano": 128000,
-    "gpt-5.1": 128000,
-    "gpt-4o": 128000,
-    "gpt-4o-mini": 128000,
-    "gpt-4-turbo": 128000,
-    "gpt-4-turbo-preview": 128000,
-    "gpt-4-vision-preview": 128000,
-    "gpt-4": 8192,
-    "gpt-4-32k": 32768,
-    "gpt-3.5-turbo": 16385,
+    "gpt-4o": 128_000,
+    "gpt-4o-mini": 128_000,
+    # Legacy entries remain for compatible providers and existing configurations.
+    "gpt-4-turbo": 128_000,
+    "gpt-4-turbo-preview": 128_000,
+    "gpt-4-vision-preview": 128_000,
+    "gpt-4": 8_192,
+    "gpt-4-32k": 32_768,
+    "gpt-3.5-turbo": 16_385,
 }
 
-# Prompt role name overrides.
-ROLE_OVERRIDES = {
-    "o1": "user",
-    "o1-pro": "user",
-    "o1-mini": "user",
-    "o3": "user",
-    "o3-mini": "user",
-    "o4": "user",
-    "o4-mini": "user",
+# Some models have a separate input ceiling in addition to the context window.
+INPUT_LIMITS = {
+    "gpt-5": 272_000,
+    "gpt-5-mini": 272_000,
+    "gpt-5-nano": 272_000,
+    "gpt-5.4-mini": 272_000,
+    "gpt-5.4-nano": 272_000,
+    "gpt-5.6": 922_000,
+    "gpt-5.6-sol": 922_000,
+    "gpt-5.6-terra": 922_000,
+    "gpt-5.6-luna": 922_000,
+    "gpt-6-astra": 922_000,
 }
-# Model parameter overrides.
-PARAM_OVERRIDES = {
-    "o1": lambda params: {},
-    "o1-pro": lambda params: {},
-    "o1-mini": lambda params: {},
-    "o3": lambda params: {},
-    "o3-mini": lambda params: {},
-    "o4": lambda params: {},
-    "o4-mini": lambda params: {},
-    "gpt-5": lambda params: {},
-    "gpt-5-mini": lambda params: {},
-    "gpt-5-nano": lambda params: {},
-    "gpt-5.1": lambda params: {},
-}
+
+
+def _model_name(name: str) -> str:
+    """Resolves provider prefixes and dated snapshots for local metadata only."""
+    for prefix in ("openai/", "google/"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+    return re.sub(r"-\d{4}-\d{2}-\d{2}$", "", name)
+
+
+def _prepare_params(name: str, params: dict) -> dict:
+    """Keeps the output budget and adapts parameters for reasoning models."""
+    name = _model_name(name)
+    result = params.copy()
+    if name not in MODELS or not name.startswith(("gpt-5", "gpt-6", "o1", "o3", "o4")):
+        # An explicitly configured modern limit takes precedence over the default.
+        if "max_completion_tokens" in result:
+            result.pop("max_tokens", None)
+        return result
+
+    max_tokens = result.pop("max_tokens", None)
+    if "max_completion_tokens" not in result and max_tokens is not None:
+        result["max_completion_tokens"] = max_tokens
+    # These controls are not portable across reasoning models/effort levels.
+    for key in ("temperature", "top_p", "logprobs", "top_logprobs",
+                "presence_penalty", "frequency_penalty"):
+        result.pop(key, None)
+    if name.startswith("gpt-5."):
+        result.setdefault("reasoning_effort", "none")
+    elif name == "gpt-6-astra" and result.get("reasoning_effort") in (None, "none", "minimal"):
+        result["reasoning_effort"] = "low"
+    return result
 
 
 class Model:
@@ -84,14 +116,16 @@ class Model:
     ) -> str:
         """Asks the language model a question and returns an answer."""
         model = self.name or config.openai.model
-        prompt_role = ROLE_OVERRIDES.get(model) or "system"
-        params_func = PARAM_OVERRIDES.get(model) or (lambda params: params)
-
-        n_input = _calc_n_input(model, n_output=config.openai.params["max_tokens"])
+        prompt_role = (
+            "user" if _model_name(model) in {"o1", "o1-mini", "o3", "o3-mini", "o4-mini"}
+            else "system"
+        )
+        params = _prepare_params(model, config.openai.params)
+        n_output = params.get("max_completion_tokens", params.get("max_tokens", 4096))
+        n_input = _calc_n_input(model, n_output=n_output)
         messages = self._generate_messages(prompt_role, prompt, question, history)
         messages = shorten(messages, length=n_input)
 
-        params = params_func(config.openai.params)
         logger.debug(
             "> chat request: model=%s, params=%s, messages=%s",
             model,
@@ -103,12 +137,8 @@ class Model:
             messages=messages,
             **params,
         )
-        logger.debug(
-            "< chat response: prompt_tokens=%s, completion_tokens=%s, total_tokens=%s",
-            resp.usage.prompt_tokens,
-            resp.usage.completion_tokens,
-            resp.usage.total_tokens,
-        )
+        if resp.usage is not None:
+            logger.debug("< chat response: usage=%s", resp.usage)
         answer = self._prepare_answer(resp)
         return answer
 
@@ -132,9 +162,15 @@ class Model:
         if len(resp.choices) == 0:
             raise ValueError("received an empty answer")
 
-        answer = resp.choices[0].message.content
-        answer = answer.strip()
-        return answer
+        choice = resp.choices[0]
+        answer = choice.message.content
+        if not answer or not answer.strip():
+            if choice.finish_reason == "length":
+                raise ValueError(
+                    "output limit reached; increase max_tokens or lower reasoning_effort"
+                )
+            raise ValueError(choice.message.refusal or "received an empty answer")
+        return answer.strip()
 
 
 def _calc_tokens(s: str) -> int:
@@ -179,6 +215,13 @@ def _calc_n_input(name: str, n_output: int) -> int:
     """
     # OpenAI counts length in tokens, not characters.
     # We need to leave some tokens reserved for the output.
+    name = _model_name(name)
     n_total = MODELS.get(name) or config.openai.window
-    logger.debug("model=%s, n_total=%s, n_output=%s", name, n_total, n_output)
-    return n_total - n_output
+    if not isinstance(n_output, int) or isinstance(n_output, bool) or n_output <= 0:
+        raise ValueError("output token limit must be a positive integer")
+    if name.startswith("gemini-") and name in MODELS:
+        return n_total
+    n_input = min(n_total - n_output, INPUT_LIMITS.get(name, n_total))
+    if n_input <= 0:
+        raise ValueError("output token limit must be smaller than the context window")
+    return n_input

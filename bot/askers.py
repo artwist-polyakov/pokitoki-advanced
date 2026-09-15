@@ -17,11 +17,11 @@ from bot import ai, markdown
 class Asker:
     """Asks AI questions and responds with answers."""
 
-    async def ask(self, prompt: str, question: str, history: list[tuple[str, str]]) -> str:
+    async def ask(self, prompt: str, question: str, history: list[tuple[str, str]]) -> bytes | str:
         """Asks AI a question."""
         pass
 
-    async def reply(self, message: Message, context: CallbackContext, answer: str) -> None:
+    async def reply(self, message: Message, context: CallbackContext, answer: bytes | str) -> None:
         """Replies with an answer from AI."""
         pass
 
@@ -64,25 +64,22 @@ class ImagineAsker(Asker):
     """Works with image generation AI."""
 
     model = ai.images.Model()
-    size_re = re.compile(r"(256|512|1024)(?:x\1)?\s?(?:px)?")
-    sizes = {
-        "256": "256x256",
-        "512": "512x512",
-        "1024": "1024x1024",
-        "1792": "1792x1024",
-    }
+    size_re = re.compile(
+        r"\b(?:1024x1536|1536x1024|1792x1024|1024x1792|"
+        r"(256|512|1024)(?:x\1)?)(?:\s?px)?\b"
+    )
     default_size = "1024x1024"
 
     def __init__(self) -> None:
         self.caption = ""
 
-    async def ask(self, prompt: str, question: str, history: list[tuple[str, str]]) -> str:
+    async def ask(self, prompt: str, question: str, history: list[tuple[str, str]]) -> bytes | str:
         """Asks AI a question."""
         size = self._extract_size(question)
         self.caption = self._extract_caption(question)
         return await self.model.imagine(prompt=self.caption, size=size)
 
-    async def reply(self, message: Message, context: CallbackContext, answer: str) -> None:
+    async def reply(self, message: Message, context: CallbackContext, answer: bytes | str) -> None:
         """Replies with an answer from AI."""
         await message.reply_photo(answer, caption=self.caption)
 
@@ -90,8 +87,8 @@ class ImagineAsker(Asker):
         match = self.size_re.search(question)
         if not match:
             return self.default_size
-        width = match.group(1)
-        return self.sizes.get(width, width)
+        size = match.group(0).removesuffix("px").strip()
+        return f"{size}x{size}" if "x" not in size else size
 
     def _extract_caption(self, question: str) -> str:
         caption = self.size_re.sub("", question).strip()

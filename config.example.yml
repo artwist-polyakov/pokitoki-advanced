@@ -7,9 +7,9 @@ conversation:
 imagine:
     enabled: users_only
 openai:
-    api_key: ''
-    image_model: dall-e-3
-    model: gpt-4o-mini
+    api_key: 'YOUR_OPENAI_API_KEY'
+    image_model: gpt-image-2.5-flare
+    model: gpt-5.6-luna
     params:
         max_tokens: 4096
         temperature: 0.7

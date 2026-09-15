@@ -267,10 +267,11 @@ async def reply_to(
             f"n_chars={len(answer)}, len_history={len(history)}, took={elapsed}ms"
         )
 
-        user.messages.add(question, answer)
+        if isinstance(answer, str):
+            user.messages.add(question, answer)
         await asker.reply(message, context, answer)
 
-        if send_voice_reply and config.voice.tts_enabled:
+        if send_voice_reply and config.voice.tts_enabled and isinstance(answer, str):
             speech_file = await voice_processor.text_to_speech(answer)
             if speech_file:
                 try:
