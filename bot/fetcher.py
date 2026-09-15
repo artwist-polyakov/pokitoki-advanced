@@ -3,14 +3,11 @@ import re
 import urllib.parse
 import ipaddress
 
-import aiohttp
 import httpx
 from bs4 import BeautifulSoup
-from httpx import HTTPStatusError, RequestError, TimeoutException
+from httpx import HTTPStatusError, RequestError
 
 from bot.config import config
-
-# todo make scrape.do and httpx output similar
 
 
 class Fetcher:
@@ -24,7 +21,7 @@ class Fetcher:
         """
         By default, we use an httpx.AsyncClient with browser-like headers.
         If the server returns 403, or we face network issues,
-        we'll attempt to use Scrap.do as a fallback (if a token is provided).
+        we'll attempt to use Scrape.do as a fallback (if a token is provided).
         """
         headers = {
             "User-Agent": (
@@ -75,104 +72,56 @@ class Fetcher:
             return False
 
     async def _fetch_url(self, url: str) -> str:
-        """
-        1) Try loading the page via httpx (self.client).
-        2) If we get 403 Forbidden, or certain network errors (timeout, etc.),
-           and we have a valid Scrap.do token, try Scrap.do as fallback.
-        3) Otherwise, re-raise the exception.
-        """
+        """Fetches a resource and extracts text using either transport."""
         try:
-            response = await self.client.get(url)
-            response.raise_for_status()
+            response = await self._fetch_response(url)
             return Content(response).extract_text()
-
-        except HTTPStatusError as exc:
-            # If it's a 403, let's try fallback
-            if exc.response.status_code == 403 or exc.response.status_code == 401:
-                token = config.scrapdo.token
-                if token and token.strip():
-                    return await self._fetch_via_scrapdo(url, token)
-            # Not a 403 or no token -> re-raise
+        except (HTTPStatusError, RequestError):
             raise
-
-        except TimeoutException as exc:
-            # If we face typical network issues, fallback to Scrap.do if token is set
-            token = config.scrapdo.token
-            if token and token.strip():
-                return await self._fetch_via_scrapdo(url, token)
-            else:
-                raise
-
-        except (
-            httpx.ReadTimeout,
-            httpx.ConnectError,
-            httpx.RemoteProtocolError,
-            httpx.TooManyRedirects,
-        ) as net_exc:
-            # If we face typical network issues, fallback to Scrap.do if token is set
-            token = config.scrapdo.token
-            if token and token.strip():
-                return await self._fetch_via_scrapdo(url, token)
-            else:
-                raise net_exc
-
-        except RequestError as req_err:
-            # A generic request error, could be anything
-            # Try fallback if token is available
-            token = config.scrapdo.token
-            if token and token.strip():
-                return await self._fetch_via_scrapdo(url, token)
-            else:
-                raise req_err
-
         except Exception as exc:
             return f"Failed to fetch ({exc.__class__.__module__}.{exc.__class__.__qualname__})"
 
-    async def _fetch_via_scrapdo(self, url: str, token: str) -> str:
-        """
-        Makes a request to Scrap.do (https://scrape.do/docs):
-          GET http://api.scrape.do?token=<token>&url=<encoded_url>
-        Returns the extracted text or the raw HTML.
-        """
-        encoded_url = urllib.parse.quote(url, safe="")
-        base_api = "http://api.scrape.do"
-        params = f"token={token}&url={encoded_url}"
-        full_url = f"{base_api}?{params}"
+    async def _fetch_response(self, url: str) -> httpx.Response:
+        """Tries a direct request, then Scrape.do for access or network errors."""
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            return response
+        except HTTPStatusError as exc:
+            if exc.response.status_code not in (401, 403):
+                raise
+            token = config.scrapdo.token
+            if not token or not token.strip():
+                raise
+        except RequestError:
+            token = config.scrapdo.token
+            if not token or not token.strip():
+                raise
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                full_url,
-                timeout=self.timeout,
+        return await self._fetch_via_scrapdo(url, token)
+
+    async def _fetch_via_scrapdo(self, url: str, token: str) -> httpx.Response:
+        """Returns a Scrape.do response with the same interface as a direct request."""
+        try:
+            response = await self.client.get(
+                "https://api.scrape.do",
+                params={"token": token, "url": url},
                 headers={
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
                     "Accept-Encoding": "gzip, deflate",
                 },
-            ) as resp:
-                if resp.status == 401:
-                    raise ValueError("Invalid Scrap.do token OR Scrape.do is banned")
-                if resp.status == 429:
-                    raise ValueError("Scrap.do rate limit exceeded")
-
-                resp.raise_for_status()
-
-                html_text = await resp.text(encoding="utf-8")
-                fake_resp = FakeHttpxResponse(html_text, resp.headers)
-                return Content(fake_resp).extract_text()
-
-
-class FakeHttpxResponse:
-    """
-    Minimalistic mock object to emulate some of the httpx.Response interface
-    that our Content class depends on.
-    """
-
-    def __init__(self, text: str, headers):
-        self._text = text
-        self.headers = headers
-
-    @property
-    def text(self) -> str:
-        return self._text
+            )
+            response.raise_for_status()
+            return response
+        except HTTPStatusError as exc:
+            # HTTPX includes the token-bearing request URL in its default message.
+            raise HTTPStatusError(
+                f"Scrape.do returned HTTP {exc.response.status_code}",
+                request=exc.request,
+                response=exc.response,
+            ) from None
+        except RequestError as exc:
+            raise type(exc)("Scrape.do request failed", request=exc.request) from None
 
 
 class Content:
@@ -184,8 +133,7 @@ class Content:
         "application/xml",
     }
 
-    def __init__(self, response):
-        # Expecting response.headers to be a dict-like
+    def __init__(self, response: httpx.Response):
         content_type = response.headers.get("content-type", "")
         content_type, _, _ = content_type.partition(";")
         self.content_type = content_type.strip().lower()

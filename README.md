@@ -137,11 +137,65 @@ The `/prompt` command in group chats is only available to admins - users listed 
 
 To change the model for the current chat, use the `/model` command:
 
-> 🧑 /model gpt-4o
+> 🧑 /model gpt-5.6-luna
 
 To return to the default model, use `/model reset`.
 
 Only admins - users listed in the `telegram.admins` property - can change the model in any chat.
+
+The default chat model is `gpt-5.6-luna`. Other current options include
+`gpt-5.6-terra`, `gpt-5.6-sol`, and `gpt-6-astra`. For Gemini, configure
+`openai.url: https://generativelanguage.googleapis.com/v1beta/openai/` and use
+`gemini-3.8-flash`, `gemini-3.5-flash-lite`, or `gemini-3.1-pro-preview`.
+The model must be available through your configured provider and API key.
+
+Model metadata was checked on **2026-09-15** against the
+[OpenAI model catalog](https://developers.openai.com/api/docs/models) and
+[Gemini model catalog](https://ai.google.dev/gemini-api/docs/models).
+The bot accepts custom model names; unlisted models use `openai.window` as the
+context limit. Dated OpenAI snapshots and `openai/` / `google/` provider prefixes
+reuse the corresponding model's metadata without changing the requested ID.
+Token counts are estimates, not an exact tokenizer or a guarantee that every
+request fits the provider's limit. Known models use their documented limits;
+`openai.window` applies only to unknown models.
+
+`openai.params.max_tokens` remains supported. For reasoning models, the bot sends
+it as `max_completion_tokens`, including the model's reasoning tokens. An explicit
+`max_completion_tokens` takes precedence. Sampling controls (`temperature`,
+`top_p`, log probabilities, and presence/frequency penalties) are omitted for
+reasoning models. Other parameters, such as `response_format`, are preserved.
+GPT-5.1 and newer GPT-5 models default to `reasoning_effort: none` for quick chat
+responses; set `openai.params.reasoning_effort` to enable reasoning. GPT-6 Astra
+uses `low` when the setting is absent, `none`, or `minimal`.
+
+### Updating an existing configuration
+
+Explicitly configured models are preserved. To switch an existing installation,
+update `openai.model` and `openai.image_model` in its YAML configuration (and reset
+any per-chat `/model` override if needed). The example configuration now uses
+`gpt-5.6-luna` and `gpt-image-2.5-flare`. Replace `YOUR_OPENAI_API_KEY` with your
+provider's key; providers without authentication still need a nonempty placeholder
+for the OpenAI SDK.
+
+[DALL·E 2 and 3 were removed from the OpenAI API on May 12, 2026](https://developers.openai.com/api/docs/deprecations).
+The image client supports GPT Image's base64 output and URL output from compatible
+providers. `/imagine` supports `1024x1024`, `1536x1024`, and `1024x1536`;
+legacy `256` and `512` square shortcuts become `1024x1024` for GPT Image,
+and DALL·E dimensions `1792x1024` / `1024x1792` map to `1536x1024` / `1024x1536`.
+If a compatible provider still serves an explicitly configured DALL·E model,
+landscape/portrait sizes map back to DALL·E 3 dimensions; DALL·E 2 uses a square.
+Generated images are sent to Telegram and excluded from text history and speech
+replies, whether the provider returns image bytes or a URL.
+See the [image API guide](https://developers.openai.com/api/docs/guides/image-generation).
+
+Voice models remain configurable through `voice.model` and `voice.tts.model`.
+The existing `whisper-1` / `tts-1` defaults remain available. For short messages,
+you can select `gpt-4o-mini-transcribe` and `gpt-4o-mini-tts`; their smaller limits
+(2,000 output tokens for transcription and 2,000 input tokens for speech) should
+be considered before switching long recordings or replies. See the
+[transcription model](https://developers.openai.com/api/docs/models/gpt-4o-mini-transcribe)
+and [speech model](https://developers.openai.com/api/docs/models/gpt-4o-mini-tts).
+
 
 ## Other useful features
 
@@ -213,7 +267,7 @@ Bot information:
 - access to messages: True
 
 AI information:
-- model: gpt-4o-mini
+- model: gpt-5.6-luna
 - provider: api.openai.com
 - history depth: 5
 - shortcuts: proofread, summarize

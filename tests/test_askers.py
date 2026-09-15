@@ -1,5 +1,6 @@
 import datetime as dt
 import unittest
+from unittest.mock import AsyncMock
 
 from telegram import Chat, Message, User
 from telegram.ext import CallbackContext
@@ -63,6 +64,21 @@ class ImagineAskerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(size, "256x256")
         size = asker._extract_size(question="a cat 384")
         self.assertEqual(size, "1024x1024")
+
+    async def test_reply_sends_image_bytes(self):
+        asker = ImagineAsker()
+        asker.caption = "A cat"
+        message = AsyncMock()
+        await asker.reply(message, None, b"image bytes")
+        message.reply_photo.assert_awaited_once_with(b"image bytes", caption="A cat")
+
+    def test_landscape_portrait_and_size_boundaries(self):
+        asker = ImagineAsker()
+        for size in ("1536x1024", "1024x1536", "1792x1024", "1024x1792"):
+            with self.subTest(size=size):
+                self.assertEqual(asker._extract_size(f"A cat {size}"), size)
+                self.assertEqual(asker._extract_caption(f"A cat {size}"), "A cat")
+        self.assertEqual(asker._extract_caption("A cat 1256"), "A cat 1256")
 
     def test_extract_caption(self):
         asker = ImagineAsker()

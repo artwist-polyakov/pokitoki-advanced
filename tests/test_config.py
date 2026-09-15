@@ -25,12 +25,27 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(config.openai.params["temperature"], 0.7)
         self.assertEqual(config.openai.params["max_tokens"], 4096)
         self.assertEqual(config.openai.url, "https://api.openai.com/v1")
-        self.assertEqual(config.openai.image_model, "dall-e-3")
+        self.assertEqual(config.openai.image_model, "gpt-image-2.5-flare")
 
         self.assertEqual(config.conversation.depth, 5)
         self.assertEqual(config.imagine.enabled, "none")
         self.assertEqual(config.persistence_path, "./data/persistence.pkl")
         self.assertEqual(config.shortcuts, {})
+
+    def test_new_defaults_and_explicit_models(self):
+        src = {
+            "telegram": {"token": "tg-test"},
+            "openai": {"api_key": "test-key"},
+            "conversation": {},
+            "imagine": {},
+        }
+        config = Config("unused.yml", src)
+        self.assertEqual(config.openai.model, "gpt-5.6-luna")
+        self.assertEqual(config.openai.image_model, "gpt-image-2.5-flare")
+        src["openai"].update(model="provider/model", image_model="provider/image")
+        config = Config("unused.yml", src)
+        self.assertEqual(config.openai.model, "provider/model")
+        self.assertEqual(config.openai.image_model, "provider/image")
 
     def test_as_dict(self):
         src = {
@@ -48,7 +63,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(data["openai"]["api_key"], src["openai"]["api_key"])
         self.assertEqual(data["openai"]["model"], src["openai"]["model"])
         self.assertEqual(data["openai"]["url"], "https://api.openai.com/v1")
-        self.assertEqual(data["openai"]["image_model"], "dall-e-3")
+        self.assertEqual(data["openai"]["image_model"], "gpt-image-2.5-flare")
         self.assertEqual(data["conversation"]["depth"], src["conversation"]["depth"])
         self.assertEqual(data["imagine"]["enabled"], src["imagine"]["enabled"])
 

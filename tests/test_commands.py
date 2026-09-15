@@ -1,5 +1,6 @@
 import datetime as dt
 import unittest
+from unittest.mock import AsyncMock, patch
 
 from telegram import Chat, Message, MessageEntity, Update, User
 from telegram.constants import ChatType
@@ -370,6 +371,29 @@ class ImagineTest(unittest.IsolatedAsyncioTestCase, Helper):
         self.user = User(id=1, first_name="Alice", is_bot=False, username="alice")
         self.command = commands.Imagine(bot.reply_to)
         config.telegram.usernames = ["alice"]
+
+    async def test_generated_image_bytes_are_not_stored_in_text_history(self):
+        config.imagine.enabled = "users_only"
+        update = self._create_update(11, "/imagine a cat")
+        with patch.object(askers.ImagineAsker.model, "imagine", AsyncMock(return_value=b"image")):
+            await bot.reply_to(update, update.message, self.context, update.message.text)
+        self.assertEqual(models.UserData(self.context.user_data).messages.as_list(), [])
+        self.assertEqual(self.bot.text, "a cat: b'image'")
+
+    async def test_image_url_is_not_stored_or_sent_to_speech(self):
+        config.imagine.enabled = "users_only"
+        update = self._create_update(11, "/imagine a cat")
+        with patch.object(askers.ImagineAsker.model, "imagine", AsyncMock(
+            return_value="https://example.org/cat.png"
+        )), patch.object(config.voice, "tts_enabled", True), patch.object(
+            bot.voice_processor, "text_to_speech", AsyncMock()
+        ) as speak:
+            await bot.reply_to(
+                update, update.message, self.context, update.message.text, send_voice_reply=True
+            )
+        self.assertEqual(models.UserData(self.context.user_data).messages.as_list(), [])
+        self.assertEqual(self.bot.text, "a cat: https://example.org/cat.png")
+        speak.assert_not_awaited()
 
     async def test_imagine(self):
         config.imagine.enabled = "users_only"

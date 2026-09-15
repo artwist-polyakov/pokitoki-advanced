@@ -26,7 +26,7 @@ class FileProcessor:
         )  # Convert MB to bytes
         self.supported_extensions = config.files.supported_extensions
         # Создаем синхронный клиент
-        self.sync_client = OpenAI(api_key=config.openai.api_key)
+        self.sync_client = OpenAI(api_key=config.openai.api_key, base_url=config.openai.url)
         self.md = MarkItDown(llm_client=self.sync_client, llm_model=config.openai.model)
         # Создаем пул потоков
         self.executor = concurrent.futures.ThreadPoolExecutor()

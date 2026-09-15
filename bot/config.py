@@ -31,7 +31,7 @@ class OpenAI:
     url: str
     image_model: str
 
-    default_model = "gpt-4o-mini"
+    default_model = "gpt-5.6-luna"
     default_window = 128000
     default_prompt = "You are an AI assistant."
     default_params = {
@@ -39,7 +39,7 @@ class OpenAI:
         "max_tokens": 4096,
     }
     default_url = "https://api.openai.com/v1"
-    default_image_model = "dall-e-3"
+    default_image_model = "gpt-image-2.5-flare"
 
     def __init__(
         self,
