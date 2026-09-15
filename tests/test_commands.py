@@ -380,6 +380,21 @@ class ImagineTest(unittest.IsolatedAsyncioTestCase, Helper):
         self.assertEqual(models.UserData(self.context.user_data).messages.as_list(), [])
         self.assertEqual(self.bot.text, "a cat: b'image'")
 
+    async def test_image_url_is_not_stored_or_sent_to_speech(self):
+        config.imagine.enabled = "users_only"
+        update = self._create_update(11, "/imagine a cat")
+        with patch.object(askers.ImagineAsker.model, "imagine", AsyncMock(
+            return_value="https://example.org/cat.png"
+        )), patch.object(config.voice, "tts_enabled", True), patch.object(
+            bot.voice_processor, "text_to_speech", AsyncMock()
+        ) as speak:
+            await bot.reply_to(
+                update, update.message, self.context, update.message.text, send_voice_reply=True
+            )
+        self.assertEqual(models.UserData(self.context.user_data).messages.as_list(), [])
+        self.assertEqual(self.bot.text, "a cat: https://example.org/cat.png")
+        speak.assert_not_awaited()
+
     async def test_imagine(self):
         config.imagine.enabled = "users_only"
         update = self._create_update(11, "/imagine a cat")
