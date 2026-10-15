@@ -179,6 +179,16 @@ class ChatRequestTest(unittest.IsolatedAsyncioTestCase):
                 _, request = await self._ask(name, {"max_tokens": 4096})
                 self.assertEqual(request["reasoning_effort"], "none")
 
+    async def test_unsupported_minimal_effort_becomes_low(self):
+        for name, effort in (("gpt-6-luna", "low"), ("gpt-6-sol", "low"),
+                             ("gpt-5.6-terra", "low"), ("gpt-5.1", "low"),
+                             ("gpt-5", "minimal")):
+            with self.subTest(model=name):
+                _, request = await self._ask(name, {
+                    "max_tokens": 4096, "reasoning_effort": "minimal",
+                })
+                self.assertEqual(request["reasoning_effort"], effort)
+
     async def test_empty_reasoning_answer_explains_output_limit(self):
         with self.assertRaisesRegex(ValueError, "increase max_tokens"):
             await self._ask("gpt-6-astra", {"max_tokens": 4096}, "", "length")

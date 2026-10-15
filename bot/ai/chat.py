@@ -82,7 +82,7 @@ INPUT_LIMITS = {
     "gpt-6-luna": 922_000,
 }
 
-# These models do not support the `none` and `minimal` reasoning efforts.
+# These models do not support the `none` reasoning effort.
 REASONING_REQUIRED = {"gpt-6-astra", "gpt-6.1-sol"}
 
 
@@ -112,11 +112,13 @@ def _prepare_params(name: str, params: dict) -> dict:
     for key in ("temperature", "top_p", "logprobs", "top_logprobs",
                 "presence_penalty", "frequency_penalty"):
         result.pop(key, None)
-    if name in REASONING_REQUIRED:
-        if result.get("reasoning_effort") in (None, "none", "minimal"):
+    if name.startswith(("gpt-5.", "gpt-6")):
+        # GPT-5.1+ and GPT-6 models do not support the `minimal` reasoning effort.
+        effort = result.get("reasoning_effort")
+        if effort == "minimal" or (name in REASONING_REQUIRED and effort in (None, "none")):
             result["reasoning_effort"] = "low"
-    elif name.startswith(("gpt-5.", "gpt-6")):
-        result.setdefault("reasoning_effort", "none")
+        else:
+            result.setdefault("reasoning_effort", "none")
     return result
 
 

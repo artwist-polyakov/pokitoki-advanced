@@ -169,7 +169,8 @@ GPT-5.1 and newer GPT-5 models, GPT-6 Sol and GPT-6 Luna default to
 `reasoning_effort: none` for quick chat responses; set
 `openai.params.reasoning_effort` to enable reasoning, e.g.
 `/config openai.params.reasoning_effort high`. GPT-6 Astra and GPT-6.1 Sol
-do not support `none` and use `low` when the setting is absent, `none`, or `minimal`.
+do not support `none` and use `low` when the setting is absent or `none`.
+GPT-5.1+ and GPT-6 models do not support `minimal`, so it is sent as `low`.
 Reasoning tokens count toward `max_tokens`, so raise it for higher efforts.
 
 ### Updating an existing configuration
