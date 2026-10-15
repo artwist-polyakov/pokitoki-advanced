@@ -114,7 +114,8 @@ class ChatRequestTest(unittest.IsolatedAsyncioTestCase):
     async def test_reasoning_models_keep_limits_and_custom_parameters(self):
         for name in ("gpt-5", "gpt-5.1", "gpt-5.2", "gpt-5.4-mini", "gpt-5.4-nano",
                      "gpt-5.5", "gpt-5.6", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-                     "gpt-6-astra", "o3", "o4-mini", "openai/gpt-5.6-luna",
+                     "gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna",
+                     "o3", "o4-mini", "openai/gpt-5.6-luna",
                      "gpt-5-2025-08-07"):
             with self.subTest(model=name):
                 params = {"max_tokens": 8192, "temperature": 0.7, "top_p": 0.9,
@@ -158,20 +159,25 @@ class ChatRequestTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("max_tokens", request)
         self.assertEqual(shorten.call_args.kwargs["length"], 280000)
 
-    async def test_astra_uses_supported_reasoning_effort(self):
-        for effort in (None, "none", "minimal", "high"):
-            with self.subTest(effort=effort):
-                _, request = await self._ask("gpt-6-astra", {
-                    "max_tokens": 4096, "reasoning_effort": effort,
-                    "logprobs": True, "top_logprobs": 2,
-                })
-                self.assertEqual(request["reasoning_effort"], "high" if effort == "high" else "low")
-                self.assertNotIn("logprobs", request)
-                self.assertNotIn("top_logprobs", request)
+    async def test_reasoning_required_models_use_supported_effort(self):
+        for name in ("gpt-6-astra", "gpt-6.1-sol"):
+            for effort in (None, "none", "minimal", "high"):
+                with self.subTest(model=name, effort=effort):
+                    _, request = await self._ask(name, {
+                        "max_tokens": 4096, "reasoning_effort": effort,
+                        "logprobs": True, "top_logprobs": 2,
+                    })
+                    self.assertEqual(
+                        request["reasoning_effort"], "high" if effort == "high" else "low"
+                    )
+                    self.assertNotIn("logprobs", request)
+                    self.assertNotIn("top_logprobs", request)
 
-    async def test_default_chat_model_uses_no_reasoning_for_low_latency(self):
-        _, request = await self._ask("gpt-5.6-luna", {"max_tokens": 4096})
-        self.assertEqual(request["reasoning_effort"], "none")
+    async def test_chat_models_use_no_reasoning_for_low_latency(self):
+        for name in ("gpt-6-luna", "gpt-6-sol", "gpt-5.6-luna"):
+            with self.subTest(model=name):
+                _, request = await self._ask(name, {"max_tokens": 4096})
+                self.assertEqual(request["reasoning_effort"], "none")
 
     async def test_empty_reasoning_answer_explains_output_limit(self):
         with self.assertRaisesRegex(ValueError, "increase max_tokens"):
@@ -186,6 +192,8 @@ class ModelLimitsTest(unittest.TestCase):
     def test_input_limits(self):
         self.assertEqual(chat._calc_n_input("gpt-5", 4096), 272000)
         self.assertEqual(chat._calc_n_input("gpt-6-astra", 4096), 922000)
+        self.assertEqual(chat._calc_n_input("gpt-6.1-sol", 4096), 922000)
+        self.assertEqual(chat._calc_n_input("gpt-6-luna", 4096), 922000)
         self.assertEqual(chat._calc_n_input("openai/gpt-5.6-luna", 4096), 922000)
         self.assertEqual(chat._calc_n_input("gpt-5-2025-08-07", 4096), 272000)
         self.assertEqual(chat._calc_n_input("gpt-4o-mini", 4096), 128000 - 4096)

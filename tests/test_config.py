@@ -40,7 +40,7 @@ class ConfigTest(unittest.TestCase):
             "imagine": {},
         }
         config = Config("unused.yml", src)
-        self.assertEqual(config.openai.model, "gpt-5.6-luna")
+        self.assertEqual(config.openai.model, "gpt-6-luna")
         self.assertEqual(config.openai.image_model, "gpt-image-2.5-flare")
         src["openai"].update(model="provider/model", image_model="provider/image")
         config = Config("unused.yml", src)
@@ -188,6 +188,11 @@ class SetValueTest(unittest.TestCase):
         self.editor.set_value("openai.params.temperature", "0.5")
         value = self.editor.get_value("openai.params.temperature")
         self.assertEqual(value, 0.5)
+
+    def test_new_params_key(self):
+        self.editor.set_value("openai.params.reasoning_effort", "high")
+        value = self.editor.get_value("openai.params.reasoning_effort")
+        self.assertEqual(value, "high")
 
     def test_invalid_type_1(self):
         with self.assertRaises(ValueError):

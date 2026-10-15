@@ -137,21 +137,22 @@ The `/prompt` command in group chats is only available to admins - users listed 
 
 To change the model for the current chat, use the `/model` command:
 
-> 🧑 /model gpt-5.6-luna
+> 🧑 /model gpt-6-luna
 
 To return to the default model, use `/model reset`.
 
 Only admins - users listed in the `telegram.admins` property - can change the model in any chat.
 
-The default chat model is `gpt-5.6-luna`. Other current options include
-`gpt-5.6-terra`, `gpt-5.6-sol`, and `gpt-6-astra`. For Gemini, configure
+The default chat model is `gpt-6-luna`. Other current options include
+`gpt-6.1-sol`, `gpt-6-astra`, and the GPT-5.6 family (`gpt-5.6-luna`,
+`gpt-5.6-terra`, `gpt-5.6-sol`). Model IDs are case-sensitive. For Gemini, configure
 `openai.url: https://generativelanguage.googleapis.com/v1beta/openai/` and use
 `gemini-3.8-flash`, `gemini-3.5-flash-lite`, or `gemini-3.1-pro-preview`.
 The model must be available through your configured provider and API key.
 
-Model metadata was checked on **2026-09-15** against the
-[OpenAI model catalog](https://developers.openai.com/api/docs/models) and
-[Gemini model catalog](https://ai.google.dev/gemini-api/docs/models).
+Model metadata was checked on **2026-10-15** against the
+[OpenAI model catalog](https://developers.openai.com/api/docs/models) and on
+**2026-09-15** against the [Gemini model catalog](https://ai.google.dev/gemini-api/docs/models).
 The bot accepts custom model names; unlisted models use `openai.window` as the
 context limit. Dated OpenAI snapshots and `openai/` / `google/` provider prefixes
 reuse the corresponding model's metadata without changing the requested ID.
@@ -164,16 +165,19 @@ it as `max_completion_tokens`, including the model's reasoning tokens. An explic
 `max_completion_tokens` takes precedence. Sampling controls (`temperature`,
 `top_p`, log probabilities, and presence/frequency penalties) are omitted for
 reasoning models. Other parameters, such as `response_format`, are preserved.
-GPT-5.1 and newer GPT-5 models default to `reasoning_effort: none` for quick chat
-responses; set `openai.params.reasoning_effort` to enable reasoning. GPT-6 Astra
-uses `low` when the setting is absent, `none`, or `minimal`.
+GPT-5.1 and newer GPT-5 models, GPT-6 Sol and GPT-6 Luna default to
+`reasoning_effort: none` for quick chat responses; set
+`openai.params.reasoning_effort` to enable reasoning, e.g.
+`/config openai.params.reasoning_effort high`. GPT-6 Astra and GPT-6.1 Sol
+do not support `none` and use `low` when the setting is absent, `none`, or `minimal`.
+Reasoning tokens count toward `max_tokens`, so raise it for higher efforts.
 
 ### Updating an existing configuration
 
 Explicitly configured models are preserved. To switch an existing installation,
 update `openai.model` and `openai.image_model` in its YAML configuration (and reset
 any per-chat `/model` override if needed). The example configuration now uses
-`gpt-5.6-luna` and `gpt-image-2.5-flare`. Replace `YOUR_OPENAI_API_KEY` with your
+`gpt-6-luna` and `gpt-image-2.5-flare`. Replace `YOUR_OPENAI_API_KEY` with your
 provider's key; providers without authentication still need a nonempty placeholder
 for the OpenAI SDK.
 
@@ -189,12 +193,14 @@ replies, whether the provider returns image bytes or a URL.
 See the [image API guide](https://developers.openai.com/api/docs/guides/image-generation).
 
 Voice models remain configurable through `voice.model` and `voice.tts.model`.
-The existing `whisper-1` / `tts-1` defaults remain available. For short messages,
-you can select `gpt-4o-mini-transcribe` and `gpt-4o-mini-tts`; their smaller limits
-(2,000 output tokens for transcription and 2,000 input tokens for speech) should
-be considered before switching long recordings or replies. See the
-[transcription model](https://developers.openai.com/api/docs/models/gpt-4o-mini-transcribe)
-and [speech model](https://developers.openai.com/api/docs/models/gpt-4o-mini-tts).
+OpenAI [deprecated](https://developers.openai.com/api/docs/deprecations) the
+`whisper-1` / `tts-1` defaults: `whisper-1` and the `gpt-4o*-transcribe` models
+will be removed on February 26, 2027, and `tts-1`, `tts-1-hd` and `gpt-4o-mini-tts`
+on January 6, 2027. The recommended speech recognition replacement,
+[`gpt-transcribe`](https://developers.openai.com/api/docs/models/gpt-transcribe),
+supports the transcription endpoint used by `voice.model`.
+The recommended speech replacement works only through the Realtime API,
+which the bot does not use yet.
 
 
 ## Other useful features
@@ -267,7 +273,7 @@ Bot information:
 - access to messages: True
 
 AI information:
-- model: gpt-5.6-luna
+- model: gpt-6-luna
 - provider: api.openai.com
 - history depth: 5
 - shortcuts: proofread, summarize

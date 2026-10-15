@@ -31,7 +31,7 @@ class OpenAI:
     url: str
     image_model: str
 
-    default_model = "gpt-5.6-luna"
+    default_model = "gpt-6-luna"
     default_window = 128000
     default_prompt = "You are an AI assistant."
     default_params = {
