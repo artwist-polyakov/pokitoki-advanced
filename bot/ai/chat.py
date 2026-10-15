@@ -12,8 +12,8 @@ openai = AsyncOpenAI(api_key=config.openai.api_key, base_url=config.openai.url)
 
 logger = logging.getLogger(__name__)
 
-# Verified 2026-09-15 against https://developers.openai.com/api/docs/models
-# and https://ai.google.dev/gemini-api/docs/models.
+# OpenAI verified 2026-10-15 against https://developers.openai.com/api/docs/models;
+# Gemini verified 2026-09-15 against https://ai.google.dev/gemini-api/docs/models.
 # OpenAI values are context windows; Gemini values are input limits.
 MODELS = {
     "gemini-3.8-flash": 1_048_576,
@@ -24,6 +24,9 @@ MODELS = {
     "gemini-2.5-flash": 1_048_576,
     "gemini-2.5-flash-lite": 1_048_576,
     "gpt-6-astra": 1_050_000,
+    "gpt-6.1-sol": 1_050_000,
+    "gpt-6-sol": 1_050_000,
+    "gpt-6-luna": 1_050_000,
     "gpt-5.6": 1_050_000,
     "gpt-5.6-sol": 1_050_000,
     "gpt-5.6-terra": 1_050_000,
@@ -74,7 +77,13 @@ INPUT_LIMITS = {
     "gpt-5.6-terra": 922_000,
     "gpt-5.6-luna": 922_000,
     "gpt-6-astra": 922_000,
+    "gpt-6.1-sol": 922_000,
+    "gpt-6-sol": 922_000,
+    "gpt-6-luna": 922_000,
 }
+
+# These models do not support the `none` reasoning effort.
+REASONING_REQUIRED = {"gpt-6-astra", "gpt-6.1-sol"}
 
 
 def _model_name(name: str) -> str:
@@ -103,10 +112,13 @@ def _prepare_params(name: str, params: dict) -> dict:
     for key in ("temperature", "top_p", "logprobs", "top_logprobs",
                 "presence_penalty", "frequency_penalty"):
         result.pop(key, None)
-    if name.startswith("gpt-5."):
-        result.setdefault("reasoning_effort", "none")
-    elif name == "gpt-6-astra" and result.get("reasoning_effort") in (None, "none", "minimal"):
-        result["reasoning_effort"] = "low"
+    if name.startswith(("gpt-5.", "gpt-6")):
+        # GPT-5.1+ and GPT-6 models do not support the `minimal` reasoning effort.
+        effort = result.get("reasoning_effort")
+        if effort == "minimal" or (name in REASONING_REQUIRED and effort in (None, "none")):
+            result["reasoning_effort"] = "low"
+        else:
+            result.setdefault("reasoning_effort", "none")
     return result
 
 
